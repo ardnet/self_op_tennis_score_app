@@ -143,3 +143,85 @@ button:disabled { cursor: not-allowed; }
   .phone-card { width: min(100%, 760px); }
   .score-action { min-height: 104px; }
 }
+
+/* Final Tie-Break serving / court guidance */
+.tie-server-panel {
+  grid-template-columns: minmax(0,1fr) auto;
+  align-items: center;
+  gap: 14px;
+}
+.eyebrow {
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .08em;
+}
+.tie-server-name {
+  display: block;
+  margin-top: 5px;
+  font-size: 20px;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+.tie-server-panel > div:first-child > span {
+  display: block;
+  margin-top: 4px;
+  color: #94a3b8;
+  font-size: 12px;
+}
+.court-side-card {
+  min-width: 118px;
+  border: 1px solid #334155;
+  border-radius: 14px;
+  padding: 10px 11px;
+  text-align: right;
+  background: #111827;
+}
+.court-side-card small,
+.court-side-card span {
+  display: block;
+  color: #94a3b8;
+  font-size: 10px;
+}
+.court-side-card strong {
+  display: block;
+  margin: 3px 0;
+  font-size: 12px;
+}
+.tie-rotation-panel { gap: 10px; }
+.tie-rotation-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: start;
+}
+.tie-rotation-top > div { min-width: 0; }
+.tie-rotation-top small { font-size: 10px; }
+.tie-rotation-top strong {
+  display: block;
+  margin-top: 3px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.align-right { text-align: right; }
+.change-ends-banner {
+  border: 1px dashed #64748b;
+  border-radius: 12px;
+  padding: 9px 10px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: .03em;
+  background: rgba(30,41,59,.7);
+}
+.rotation-order {
+  border-top: 1px solid #263247;
+  padding-top: 9px;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 420px) {
+  .tie-server-panel { grid-template-columns: minmax(0,1fr) auto; }
+  .tie-server-name { font-size: 17px; }
+  .court-side-card { min-width: 102px; padding: 9px; }
+  .tie-rotation-top { gap: 8px; }
+}

@@ -1,7 +1,20 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { calculateGameScore, calculateTieBreak, sideName } from './domain/scoring'
-import { clampWhole, gamesTally, serverForGame, serverName, servingSideForGame } from './domain/session'
+import {
+  changesEndsAfterTieBreakPoint,
+  clampWhole,
+  gamesTally,
+  nextTieBreakEndChangeAt,
+  serverForGame,
+  serverName,
+  servingSideForGame,
+  tieBreakCourtSide,
+  tieBreakPointNumber,
+  tieBreakServerForPoint,
+  tieBreakServingOrder,
+  tieBreakServingSideForPoint,
+} from './domain/session'
 import type {
   ActiveSegment,
   DeuceMode,
@@ -448,6 +461,7 @@ function App() {
             gameNumber={currentGameIndex + 1}
             gameScore={gameScore}
             tieBreakScore={tieBreakScore}
+            tieBreakPointsPlayed={tieBreakEvents.length}
             sessionElapsed={sessionElapsed()}
             segmentElapsed={segmentElapsed()}
             stopConfirm={stopConfirm}
@@ -475,6 +489,8 @@ function App() {
             config={config}
             score={tieBreakScore}
             tally={tally}
+            completedGameCount={completedGames.length}
+            pointsPlayed={tieBreakEvents.length}
             sessionElapsed={sessionElapsed()}
             tieBreakElapsed={segmentElapsed()}
             canUndo={tieBreakEvents.length > 0}
@@ -517,7 +533,7 @@ function Welcome({ onStart }: { onStart: () => void }) {
     <section className="welcome-screen">
       <div className="ball-mark">🎾</div>
       <div>
-        <h1>Self Operated Tennis Score</h1>
+        <h1>Tennis Score</h1>
         <p>Keep score while you focus on playing.</p>
       </div>
       <button className="button button-primary button-xl" onClick={onStart}>START</button>
@@ -833,6 +849,7 @@ function PauseScreen({
   gameNumber,
   gameScore,
   tieBreakScore,
+  tieBreakPointsPlayed,
   sessionElapsed,
   segmentElapsed,
   stopConfirm,
@@ -846,6 +863,7 @@ function PauseScreen({
   gameNumber: number
   gameScore: ReturnType<typeof calculateGameScore>
   tieBreakScore: ReturnType<typeof calculateTieBreak>
+  tieBreakPointsPlayed: number
   sessionElapsed: number
   segmentElapsed: number
   stopConfirm: boolean
@@ -866,6 +884,8 @@ function PauseScreen({
           <>
             <strong>{sideName(config, 'player')} {tieBreakScore.playerPoints} — {tieBreakScore.opponentPoints} {sideName(config, 'opponent')}</strong>
             <small>Final Tie-Break</small>
+            <small>Serving: {serverName(config, tieBreakServerForPoint(config, config.totalGames, tieBreakPointsPlayed))}</small>
+            <small>Court: {tieBreakCourtSide(tieBreakPointsPlayed) === 'deuce' ? 'Deuce (Right)' : 'Ad (Left)'}</small>
           </>
         ) : (
           <>
@@ -956,6 +976,8 @@ function TieBreakLiveScreen({
   config,
   score,
   tally,
+  completedGameCount,
+  pointsPlayed,
   sessionElapsed,
   tieBreakElapsed,
   canUndo,
@@ -967,6 +989,8 @@ function TieBreakLiveScreen({
   config: SessionConfig
   score: ReturnType<typeof calculateTieBreak>
   tally: { player: number; opponent: number }
+  completedGameCount: number
+  pointsPlayed: number
   sessionElapsed: number
   tieBreakElapsed: number
   canUndo: boolean
@@ -975,16 +999,53 @@ function TieBreakLiveScreen({
   onUndo: () => void
   onPause: () => void
 }) {
+  const currentServer = tieBreakServerForPoint(config, completedGameCount, pointsPlayed)
+  const servingSide = tieBreakServingSideForPoint(config, completedGameCount, pointsPlayed)
+  const courtSide = tieBreakCourtSide(pointsPlayed)
+  const pointNumber = tieBreakPointNumber(pointsPlayed)
+  const changeEndsAfterThisPoint = changesEndsAfterTieBreakPoint(pointsPlayed)
+  const nextEndChange = nextTieBreakEndChangeAt(pointsPlayed)
+  const servingOrder = tieBreakServingOrder(config, completedGameCount)
+    .map((server) => serverName(config, server))
+    .join(' → ')
+
   return (
     <section className="screen-stack compact">
       <div className="result-hero compact-hero"><small>FINAL TIE-BREAK</small><p>Games finished {tally.player}–{tally.opponent}</p></div>
       <TimerStrip sessionElapsed={sessionElapsed} segmentElapsed={tieBreakElapsed} segmentLabel="Tie-Break" />
+
       <div className="tie-score panel no-pad">
         <TieScoreRow name={sideName(config, 'player')} score={score.playerPoints} />
         <TieScoreRow name={sideName(config, 'opponent')} score={score.opponentPoints} />
       </div>
+
+      <div className="panel tie-server-panel">
+        <div>
+          <small className="eyebrow">CURRENT SERVER</small>
+          <strong className="tie-server-name">{serverName(config, currentServer)} SERVES</strong>
+          <span>{config.mode === 'double' ? `Team: ${sideName(config, servingSide)}` : sideName(config, servingSide)}</span>
+        </div>
+        <div className="court-side-card">
+          <small>Court Side</small>
+          <strong>{courtSide === 'deuce' ? 'DEUCE COURT' : 'AD COURT'}</strong>
+          <span>{courtSide === 'deuce' ? 'Right' : 'Left'}</span>
+        </div>
+      </div>
+
+      <div className="panel tie-rotation-panel">
+        <div className="tie-rotation-top">
+          <div><small>Tie-Break Point</small><strong>Point {pointNumber}</strong></div>
+          <div className="align-right">
+            <small>{changeEndsAfterThisPoint ? 'After this point' : 'Next end change'}</small>
+            <strong>{changeEndsAfterThisPoint ? 'CHANGE ENDS' : `At total ${nextEndChange} points`}</strong>
+          </div>
+        </div>
+        {changeEndsAfterThisPoint && <div className="change-ends-banner">CHANGE ENDS AFTER THIS POINT</div>}
+        <small className="rotation-order">Serving order: {servingOrder}</small>
+      </div>
+
       <TieBreakBanner config={config} score={score} />
-      <PointButtons config={config} onPlayerPoint={onPlayerPoint} onOpponentPoint={onOpponentPoint} />
+      <PointButtons config={config} inSide={servingSide} onPlayerPoint={onPlayerPoint} onOpponentPoint={onOpponentPoint} />
       <div className="two-col">
         <button className="button button-secondary" disabled={!canUndo} onClick={onUndo}>↶ UNDO</button>
         <button className="button button-secondary" onClick={onPause}>Ⅱ PAUSE</button>

@@ -43,8 +43,8 @@ Player 1 → Opponent 2 → Player 2 → Opponent 1 → repeat
 ### During play
 
 - Standard tennis scoring: 0 → 15 → 30 → 40 → Deuce → Advantage → Game
-- IN = Player / Player Group wins the point
-- OUT = Opponent / Opponent Group wins the point
+- IN = the **current serving side** wins the point
+- OUT = the **receiving side** wins the point
 - Large scoring controls for on-court use
 - Undo
 - Pause / Continue
@@ -69,7 +69,16 @@ Each Game stops automatically when won.
 
 If all configured Games finish tied and Final Tie-Break is selected, the app pauses before starting the Tie-Break.
 
-The Tie-Break has its own active timer and point history.
+The Tie-Break has its own active timer and point history. It also follows tennis Tie-Break serving rotation:
+
+- Point 1 is served by the **next scheduled server** from the existing Game rotation.
+- After Point 1, each subsequent server serves **two consecutive points**.
+- Singles follows `A → B,B → A,A → B,B → ...`.
+- Doubles continues the established four-player order, for example `Max → Ardi → Zac → Sinner`, using the same 1-then-2-point rhythm.
+- The Tie-Break screen shows the current individual server and team/side.
+- **IN** awards the point to the current server's side; **OUT** awards it to the receiving side.
+- The upcoming serve is labelled **Deuce Court (Right)** or **Ad Court (Left)**.
+- The UI warns when players should change ends after Tie-Break points **6, 12, 18, ...**.
 
 ### Session Result
 
@@ -184,12 +193,12 @@ No user account, cloud database, authentication, or API is required in this vers
 
 ## IN / OUT behaviour
 
-During a normal Game, the large scoring buttons follow the **current server**:
+During both normal Games and the Final Tie-Break, the large scoring buttons follow the **current server**:
 
 - **IN** = the serving side wins the point.
 - **OUT** = the receiving side wins the point.
 
-The labels and actual point-award action switch automatically as service rotates. This applies to both Singles and Doubles.
+The labels and actual point-award action switch automatically as service rotates. This applies to both Singles and Doubles, including Tie-Break service changes.
 
 Example in Doubles:
 

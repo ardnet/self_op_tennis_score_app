@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.0 - Final Tie-Break serving rotation + court guidance
+
+- Final Tie-Break now starts with the next scheduled server from the established Game rotation.
+- Implements the standard 1-then-2-point serving rhythm (A → BB → AA → ...).
+- Doubles continues through the established four-player serving sequence.
+- Final Tie-Break IN / OUT buttons now follow the current server side.
+- Shows the current individual server and team/side.
+- Shows Deuce Court (Right) / Ad Court (Left) for the upcoming serve.
+- Shows the current Tie-Break point number and serving-order preview.
+- Flags end changes after points 6, 12, 18, etc.
+- Tie-Break Pause screen also shows the current server and court side.
+
 ## 0.2.1 - Server-relative IN / OUT scoring fix
 
 - IN now awards the point to the side currently serving.
