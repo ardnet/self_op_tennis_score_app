@@ -180,3 +180,19 @@ For a manual Netlify configuration use:
 The app stores the active setup/session in browser `localStorage` under a new multi-Game storage key. This avoids collisions with the earlier single-Game MVP.
 
 No user account, cloud database, authentication, or API is required in this version.
+
+
+## IN / OUT behaviour
+
+During a normal Game, the large scoring buttons follow the **current server**:
+
+- **IN** = the serving side wins the point.
+- **OUT** = the receiving side wins the point.
+
+The labels and actual point-award action switch automatically as service rotates. This applies to both Singles and Doubles.
+
+Example in Doubles:
+
+- Zac serving → IN = Max / Zac + point; OUT = Ardi / Sinner + point.
+- Sinner serving → IN = Ardi / Sinner + point; OUT = Max / Zac + point.
+

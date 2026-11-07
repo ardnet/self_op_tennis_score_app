@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { calculateGameScore, calculateTieBreak, sideName } from './domain/scoring'
-import { clampWhole, gamesTally, serverForGame, serverName } from './domain/session'
+import { clampWhole, gamesTally, serverForGame, serverName, servingSideForGame } from './domain/session'
 import type {
   ActiveSegment,
   DeuceMode,
@@ -807,6 +807,7 @@ function LiveGameScreen({
 }) {
   const tally = gamesTally(completedGames)
   const server = serverForGame(config, currentGameIndex)
+  const servingSide = servingSideForGame(config, currentGameIndex)
 
   return (
     <section className="screen-stack compact">
@@ -817,7 +818,7 @@ function LiveGameScreen({
       </div>
       <ScoreBoard config={config} score={score} server={server} />
       <DeuceBanner config={config} score={score} />
-      <PointButtons config={config} onPlayerPoint={onPlayerPoint} onOpponentPoint={onOpponentPoint} />
+      <PointButtons config={config} inSide={servingSide} onPlayerPoint={onPlayerPoint} onOpponentPoint={onOpponentPoint} />
       <div className="two-col">
         <button className="button button-secondary" disabled={!canUndo} onClick={onUndo}>↶ UNDO</button>
         <button className="button button-secondary" onClick={onPause}>Ⅱ PAUSE</button>
@@ -1108,11 +1109,29 @@ function TieScoreRow({ name, score }: { name: string; score: number }) {
   return <div className="tie-score-row"><strong>{name}</strong><span>{score}</span></div>
 }
 
-function PointButtons({ config, onPlayerPoint, onOpponentPoint }: { config: SessionConfig; onPlayerPoint: () => void; onOpponentPoint: () => void }) {
+function PointButtons({
+  config,
+  inSide = 'player',
+  onPlayerPoint,
+  onOpponentPoint,
+}: {
+  config: SessionConfig
+  inSide?: Side
+  onPlayerPoint: () => void
+  onOpponentPoint: () => void
+}) {
+  const outSide: Side = inSide === 'player' ? 'opponent' : 'player'
+  const onInPoint = inSide === 'player' ? onPlayerPoint : onOpponentPoint
+  const onOutPoint = outSide === 'player' ? onPlayerPoint : onOpponentPoint
+
   return (
     <div className="score-buttons">
-      <button className="score-action in" onClick={onPlayerPoint}>IN<span>{sideName(config, 'player')} + point</span></button>
-      <button className="score-action out" onClick={onOpponentPoint}>OUT<span>{sideName(config, 'opponent')} + point</span></button>
+      <button className="score-action in" onClick={onInPoint}>
+        IN<span>{sideName(config, inSide)} + point</span>
+      </button>
+      <button className="score-action out" onClick={onOutPoint}>
+        OUT<span>{sideName(config, outSide)} + point</span>
+      </button>
     </div>
   )
 }
