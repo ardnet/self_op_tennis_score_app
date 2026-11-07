@@ -1,12 +1,12 @@
 import type { PersistedAppState } from '../domain/types'
 
-const STORAGE_KEY = 'tennis-score-tracker-mvp-v1'
+const STORAGE_KEY = 'tennis-score-tracker-multigame-v1'
 
 export function saveState(state: PersistedAppState): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
   } catch {
-    // MVP: silently continue if browser storage is unavailable.
+    // MVP: continue when storage is unavailable.
   }
 }
 
@@ -24,6 +24,6 @@ export function clearState(): void {
   try {
     localStorage.removeItem(STORAGE_KEY)
   } catch {
-    // MVP: ignore storage cleanup failures.
+    // MVP: ignore cleanup failures.
   }
 }

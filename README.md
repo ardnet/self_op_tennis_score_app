@@ -1,121 +1,182 @@
-# Tennis Score Tracker MVP
+# Tennis Score Tracker — Multi-Game MVP
 
-Mobile-first Phase 1 prototype for recording a single tennis Game.
+React + TypeScript + Vite implementation of the extended Phase 1 Tennis Score Tracker.
 
-## Features
+## What changed from the single-Game MVP
 
-- Singles and Doubles
-- Player/opponent name setup
-- First-server selection
+This version supports a fixed session of **2–10 Games** while retaining all existing Game-level scoring behaviour.
+
+### Setup
+
+- Singles or Doubles
+- Player names
+- Unlimited or Limited Deuce (1–10)
+- Fixed total Games: 2–10
+- Preferred Games winning margin: 1 or 2
+- If the final Games score is tied:
+  - Finish as DRAW, or
+  - Use a Final Tie-Break
+- Final Tie-Break configuration:
+  - Target / maximum point: 5–10
+  - Winning margin: 1 or 2
+  - If both sides reach the target equally:
+    - Unlimited until margin is reached
+    - Sudden Death
+    - Make it DRAW
+
+### Serving
+
+Singles alternates the server by Game.
+
+For Doubles, setup captures:
+
+- Which team serves Game 1
+- First server on the Player team
+- First server on the Opponent team
+
+The app then rotates servers automatically. Example:
+
+```text
+Player 1 → Opponent 2 → Player 2 → Opponent 1 → repeat
+```
+
+### During play
+
 - Standard tennis scoring: 0 → 15 → 30 → 40 → Deuce → Advantage → Game
-- Unlimited Deuce
-- Limited Deuce (1–10) with sudden-death point on the final Deuce
-- Large IN / OUT controls
-  - IN = Player / Player Group wins the point
-  - OUT = Opponent / Opponent Group wins the point
-- Undo last point
+- IN = Player / Player Group wins the point
+- OUT = Opponent / Opponent Group wins the point
+- Large scoring controls for on-court use
+- Undo
 - Pause / Continue
-- Stop Game confirmation
-- Stopwatch + current clock
-- Game result summary and score history
-- Browser localStorage persistence
-- Responsive mobile-first layout
+- Stop confirmation behind Pause
+- Session timer
+- Individual Game timer
+- Current clock
+- Current Game number and overall Games score
+
+### Between Games
+
+Each Game stops automatically when won.
+
+- Session timer stops
+- Game timer stops
+- Break time is not counted
+- Shows Game winner, duration, Games tally and next server
+- `UNDO LAST POINT` can reopen the completed Game
+- `CONTINUE TO GAME N` starts the next Game and resumes active timing
+
+### Final Tie-Break
+
+If all configured Games finish tied and Final Tie-Break is selected, the app pauses before starting the Tie-Break.
+
+The Tie-Break has its own active timer and point history.
+
+### Session Result
+
+The final result screen includes:
+
+- Winner or DRAW
+- Games score
+- Final Tie-Break score when applicable
+- Total active playing time
+- Per-Game winner
+- Per-Game server
+- Per-Game duration
+- Full point history for every Game
+- Full Final Tie-Break point history
+- Undo last point
+
+## Important Tie-Break interpretation
+
+There was one logical conflict in the discussed requirements:
+
+- `7–6 should finish even when the configured margin is 2`
+- but also `7–7 should trigger the configured equal-at-maximum resolution`
+
+Those two rules cannot both occur naturally because if 7–6 ends immediately, 7–7 can never be reached.
+
+To keep the approved **7–7 resolution options functional**, this implementation makes the selected margin binding at the target:
+
+- Target 7, margin 1: `7–6` wins.
+- Target 7, margin 2: `7–6` continues.
+- If it becomes `7–7`, the selected resolution is applied:
+  - Unlimited
+  - Sudden Death
+  - DRAW
+
+This behaviour is isolated in `src/domain/scoring.ts`, so it is easy to change later if desired.
 
 ## Technology
 
 - React
 - TypeScript
 - Vite
-- Browser localStorage
-- No backend required for Phase 1
+- Browser `localStorage`
+- No backend required
 
-## Local Setup
+The tennis scoring logic and serving rotation are kept outside React so they can be reused later for native iOS, Android, Apple Watch, Wear OS, or a dedicated scoring device.
 
-### Requirements
+## Project structure
 
-Install a Vite-compatible Node.js version: Node.js 20.19+ or 22.12+. A current Node.js 22 release is a good choice.
-
-Check versions:
-
-```bash
-node -v
-npm -v
+```text
+src/
+├── domain/
+│   ├── scoring.ts       Game + Tie-Break scoring engines
+│   ├── session.ts       Game tally + server rotation
+│   └── types.ts         Domain models
+├── storage/
+│   └── localStorage.ts  Browser persistence adapter
+├── App.tsx              Application workflow + UI
+├── main.tsx
+└── styles.css
 ```
 
-### Install
+## Local setup
 
-From this project directory:
+Use Node.js 22 (recommended) or another Node.js version supported by your installed Vite version.
 
 ```bash
 npm install
-```
-
-### Run locally
-
-```bash
 npm run dev
 ```
 
-Vite will show a local URL, normally:
+Open the local URL shown by Vite, normally:
 
 ```text
 http://localhost:5173
 ```
 
-Open that address in your browser.
-
-### Test from a phone on the same Wi-Fi
-
-Run:
+### Test on a phone on the same Wi-Fi
 
 ```bash
 npm run dev -- --host
 ```
 
-Vite will show a Network URL such as:
+Open the `Network` URL shown by Vite from your phone.
 
-```text
-http://192.168.1.20:5173
-```
-
-Open that Network URL from your phone while the phone and computer are on the same network.
-
-If the page is not reachable, allow Node.js/Vite through your computer firewall for private networks.
-
-## Production Build
+## Production build
 
 ```bash
 npm run build
 ```
 
-The deployable static files will be created in:
+The deployable files will be generated in:
 
 ```text
 dist/
 ```
 
-You can deploy the contents of `dist/` to any static web host, including Nginx/Apache, Netlify, Vercel, Cloudflare Pages, AWS S3 + CloudFront, or similar hosting.
+## Netlify
 
-To preview the production build locally:
+This repository includes `netlify.toml`.
 
-```bash
-npm run preview
-```
+For a manual Netlify configuration use:
 
-## Architecture
+- Build command: `npm run build`
+- Publish directory: `dist`
 
-The scoring logic is intentionally separated from the React interface:
+## Persistence
 
-```text
-src/domain/scoring.ts    Tennis rules / scoring engine
-src/domain/types.ts      Shared domain models
-src/storage/             Browser persistence adapter
-src/App.tsx              React UI and application flow
-src/styles.css           Responsive presentation
-```
+The app stores the active setup/session in browser `localStorage` under a new multi-Game storage key. This avoids collisions with the earlier single-Game MVP.
 
-This makes it easier to reuse the scoring engine later in a native iOS, Android, Apple Watch, Wear OS, or dedicated-device implementation.
-
-## Phase 1 Limitation
-
-This MVP handles one tennis Game only. Sets and Matches are planned for future phases.
+No user account, cloud database, authentication, or API is required in this version.
