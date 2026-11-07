@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.1 - Server-relative IN / OUT scoring fix
+
+- IN now awards the point to the side currently serving.
+- OUT now awards the point to the receiving side.
+- Button labels update automatically with the current server in both Singles and Doubles.
+- Example: if Zac serves, IN = Max / Zac + point; if Sinner serves, IN = Ardi / Sinner + point.
+
 ## 0.2.0 — Multi-Game MVP
 
 - Added fixed 2–10 Game sessions.
