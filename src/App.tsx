@@ -35,6 +35,7 @@ import type {
 import { clearState, loadState, saveState } from './storage/localStorage'
 import { closeLiveScoreboard, createLiveScoreboard, loadControllerSession, saveControllerSession, updateLiveScoreboard } from './live/controller'
 import type { LiveControllerSession, LiveScoreboardState, LiveSessionStatus } from './live/types'
+import { trackEvent } from './analytics'
 
 const defaultConfig: SessionConfig = {
   mode: 'single',
@@ -298,6 +299,7 @@ function App() {
       const created = await createLiveScoreboard(buildLiveScoreboardState())
       setLiveSession(created)
       setLiveSyncStatus('connected')
+      trackEvent('live_scoreboard_created', { play_mode: config.mode })
     } catch (error) {
       setLiveSyncStatus('offline')
       setLiveError(error instanceof Error ? error.message : 'Unable to create live scoreboard')
@@ -314,6 +316,7 @@ function App() {
       await closeLiveScoreboard(liveSession)
       setLiveSession(null)
       setLiveSyncStatus('idle')
+      trackEvent('live_scoreboard_closed', { reason: 'manual' })
     } catch (error) {
       setLiveError(error instanceof Error ? error.message : 'Unable to close live scoreboard')
     } finally {
@@ -348,6 +351,13 @@ function App() {
   }
 
   function startSession() {
+    trackEvent('match_started', {
+      play_mode: config.mode,
+      total_games: config.totalGames,
+      deuce_mode: config.deuceMode,
+      live_scoreboard_enabled: Boolean(liveSession),
+      tie_resolution: config.gamesTieResolution,
+    })
     resetSessionProgress()
     setCurrentGameIndex(0)
     setActiveStartedAt(nowMs())
@@ -375,6 +385,13 @@ function App() {
     const nextRecords = [...completedGames, record]
     const nextTally = gamesTally(nextRecords)
 
+    trackEvent('game_completed', {
+      game_number: record.gameNumber,
+      winner_side: record.winner,
+      had_deuce: nextScore.deuceCount > 0,
+      deuce_count: nextScore.deuceCount,
+    })
+
     setCompletedGames(nextRecords)
     setSessionElapsedBeforeRun(newSessionElapsed)
     setSegmentElapsedBeforeRun(0)
@@ -388,10 +405,14 @@ function App() {
     }
 
     if (nextTally.player !== nextTally.opponent) {
-      setOutcome({
-        winner: nextTally.player > nextTally.opponent ? 'player' : 'opponent',
+      const winner = nextTally.player > nextTally.opponent ? 'player' : 'opponent'
+      setOutcome({ winner, draw: false, decidedBy: 'games' })
+      trackEvent('match_completed', {
+        play_mode: config.mode,
+        games_played: nextRecords.length,
+        used_tiebreak: false,
         draw: false,
-        decidedBy: 'games',
+        duration_seconds: Math.floor(newSessionElapsed / 1000),
       })
       setScreen('result')
       return
@@ -399,6 +420,13 @@ function App() {
 
     if (config.gamesTieResolution === 'draw') {
       setOutcome({ winner: null, draw: true, decidedBy: 'games-draw' })
+      trackEvent('match_completed', {
+        play_mode: config.mode,
+        games_played: nextRecords.length,
+        used_tiebreak: false,
+        draw: true,
+        duration_seconds: Math.floor(newSessionElapsed / 1000),
+      })
       setScreen('result')
       return
     }
@@ -411,6 +439,11 @@ function App() {
   }
 
   function startFinalTieBreak() {
+    trackEvent('final_tiebreak_started', {
+      target_points: config.tieBreakMaxPoint,
+      winning_margin: config.tieBreakMargin,
+      equal_resolution: config.tieBreakEqualResolution,
+    })
     setTieBreakEvents([])
     setTieBreakRecord(null)
     setSegmentElapsedBeforeRun(0)
@@ -450,10 +483,18 @@ function App() {
     } else {
       setOutcome({ winner: nextScore.winner, draw: false, decidedBy: 'tiebreak' })
     }
+    trackEvent('match_completed', {
+      play_mode: config.mode,
+      games_played: completedGames.length,
+      used_tiebreak: true,
+      draw: nextScore.draw,
+      duration_seconds: Math.floor(newSessionElapsed / 1000),
+    })
     setScreen('result')
   }
 
   function pauseActivePlay() {
+    trackEvent('pause_used', { stage: activeSegment === 'tiebreak' ? 'tiebreak' : 'game' })
     const delta = runningDelta()
     setSessionElapsedBeforeRun((value) => value + delta)
     setSegmentElapsedBeforeRun((value) => value + delta)
@@ -473,10 +514,12 @@ function App() {
   function undoCurrentPoint() {
     if (activeSegment === 'tiebreak') {
       if (!tieBreakEvents.length) return
+      trackEvent('undo_used', { stage: 'tiebreak' })
       setTieBreakEvents((events) => events.slice(0, -1))
       return
     }
     if (!currentGameEvents.length) return
+    trackEvent('undo_used', { stage: 'game' })
     setCurrentGameEvents((events) => events.slice(0, -1))
   }
 
@@ -548,12 +591,12 @@ function App() {
     <main className="app-shell">
       <div className="phone-card">
         {liveSession && screen !== 'server' && <LiveControllerStatus session={liveSession} syncStatus={liveSyncStatus} busy={liveBusy} error={liveError} onClose={handleCloseLiveScoreboard} />}
-        {screen === 'welcome' && <Welcome onStart={() => setScreen('mode')} />}
+        {screen === 'welcome' && <Welcome onStart={() => { trackEvent('match_setup_started'); setScreen('mode') }} />}
 
         {screen === 'mode' && (
           <ModeScreen
             mode={config.mode}
-            onSelect={(mode) => setConfig((current) => ({ ...current, mode }))}
+            onSelect={(mode) => { trackEvent('play_mode_selected', { play_mode: mode }); setConfig((current) => ({ ...current, mode })) }}
             onBack={() => setScreen('welcome')}
             onNext={() => setScreen('names')}
           />
@@ -572,7 +615,7 @@ function App() {
           <DeuceScreen
             mode={config.deuceMode}
             maxDeuce={config.maxDeuce}
-            onMode={(deuceMode) => setConfig((current) => ({ ...current, deuceMode }))}
+            onMode={(deuceMode) => { trackEvent('deuce_mode_selected', { deuce_mode: deuceMode }); setConfig((current) => ({ ...current, deuceMode })) }}
             onMax={(maxDeuce) => setConfig((current) => ({ ...current, maxDeuce }))}
             onBack={() => setScreen('names')}
             onNext={() => setScreen('games')}
@@ -721,7 +764,7 @@ function Welcome({ onStart }: { onStart: () => void }) {
     <section className="welcome-screen">
       <div className="ball-mark">🎾</div>
       <div>
-        <h1>Self-Operated Tennis Score</h1>
+        <h1>Tennis Score</h1>
         <p>Keep score while you focus on playing.</p>
       </div>
       <button className="button button-primary button-xl" onClick={onStart}>START</button>

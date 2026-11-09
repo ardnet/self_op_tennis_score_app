@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { liveScoreboardConfigured, supabase } from './supabase'
 import type { LiveScoreboardRow, LiveScoreboardState } from './types'
 import '../liveScoreboard.css'
+import { trackEvent } from '../analytics'
 
 function codeFromPath() {
   const parts = window.location.pathname.split('/').filter(Boolean)
@@ -30,6 +31,7 @@ export default function LiveScoreboard() {
   const [loading, setLoading] = useState(true)
   const [connection, setConnection] = useState<'connecting' | 'live' | 'offline'>('connecting')
   const [now, setNow] = useState(Date.now())
+  const analyticsViewTracked = useRef(false)
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 500)
@@ -80,6 +82,16 @@ export default function LiveScoreboard() {
       if (channel && supabase) supabase.removeChannel(channel)
     }
   }, [publicCode])
+
+
+  useEffect(() => {
+    if (!row || analyticsViewTracked.current) return
+    analyticsViewTracked.current = true
+    trackEvent('live_scoreboard_viewed', {
+      play_mode: row.scoreboard_state.mode,
+      match_status: row.status,
+    })
+  }, [row])
 
   if (!liveScoreboardConfigured) {
     return <ScoreboardMessage title="Live scoreboard is not configured" detail="Supabase environment variables are missing on this deployment." />

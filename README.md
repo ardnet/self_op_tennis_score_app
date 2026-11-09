@@ -1,4 +1,6 @@
-# Self-Operated Tennis Score — Multi-Game MVP v0.4.0
+# Self-Operated Tennis Score — Multi-Game MVP v0.5.0
+
+**v0.5.0 adds Google Analytics 4 product-usage analytics. See `GA4_SETUP.md`.**
 
 Mobile-first React + TypeScript tennis scoring app for recreational Singles and Doubles, now with an optional realtime Live Scoreboard that can be opened on a TV, tablet, laptop or another phone.
 
@@ -18,7 +20,7 @@ Mobile-first React + TypeScript tennis scoring app for recreational Singles and 
 - Point history and final result summary.
 - Local browser persistence.
 
-## Live Scoreboard v0.4.0
+## Live Scoreboard v0.5.0
 
 Before LET'S PLAY, the user can optionally create a unique live scoreboard.
 
