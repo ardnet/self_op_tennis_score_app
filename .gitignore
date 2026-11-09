@@ -5,6 +5,3 @@ dist
 .env.*
 !.env.example
 *.local
-
-# Local Netlify folder
-.netlify
