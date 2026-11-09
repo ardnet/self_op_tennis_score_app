@@ -1,4 +1,4 @@
--- Tennis Score Tracker v0.4.0 - Live Scoreboard
+-- Self-Operated Tennis Score v0.4.0 - Live Scoreboard
 -- Run this once in Supabase Dashboard > SQL Editor.
 
 create extension if not exists pgcrypto;
