@@ -32,3 +32,14 @@
 - Preserved Limited/Unlimited Deuce, Undo, Pause and Stop confirmation.
 - Added Undo after a completed Game and after the final result.
 - Updated localStorage namespace for the multi-Game data model.
+
+## 0.4.0 - Optional Live Scoreboard
+
+- Added unique per-match live scoreboard links and QR codes.
+- Added read-only TV/spectator scoreboard route.
+- Added Supabase realtime synchronisation and Netlify Function write endpoints.
+- Added waiting, live, paused, between-games, final tie-break and completed-match display states.
+- Added current server, Tie-Break court side and Change Ends information to the public display.
+- Added manual close and 24-hour automatic expiry.
+- Added reconnect handling while preserving offline/local scoring.
+- Added Supabase RLS schema and deployment instructions.
