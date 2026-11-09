@@ -1,4 +1,4 @@
-# Tennis Score Tracker — Multi-Game MVP v0.4.0
+# Self-Operated Tennis Score — Multi-Game MVP v0.4.0
 
 Mobile-first React + TypeScript tennis scoring app for recreational Singles and Doubles, now with an optional realtime Live Scoreboard that can be opened on a TV, tablet, laptop or another phone.
 
