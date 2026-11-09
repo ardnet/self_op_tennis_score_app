@@ -721,7 +721,7 @@ function Welcome({ onStart }: { onStart: () => void }) {
     <section className="welcome-screen">
       <div className="ball-mark">🎾</div>
       <div>
-        <h1>Tennis Score</h1>
+        <h1>Self-Operated Tennis Score</h1>
         <p>Keep score while you focus on playing.</p>
       </div>
       <button className="button button-primary button-xl" onClick={onStart}>START</button>

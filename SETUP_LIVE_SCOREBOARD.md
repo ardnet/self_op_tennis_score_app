@@ -62,7 +62,7 @@ Never put the secret key in a variable beginning with `VITE_`.
 
 ## 3. Configure Netlify environment variables
 
-Open the Netlify project that hosts the Tennis Score Tracker.
+Open the Netlify project that hosts the Self-Operated Tennis Score.
 
 Go to the project's environment variables configuration and add:
 
@@ -126,7 +126,7 @@ Netlify should deploy these functions:
 
 After deployment:
 
-1. Open the normal Tennis Score Tracker URL on Phone A.
+1. Open the normal Self-Operated Tennis Score URL on Phone A.
 2. Configure a Singles or Doubles session.
 3. Reach the final server/setup screen.
 4. Tap **CREATE LIVE SCOREBOARD**.
