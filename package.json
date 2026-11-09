@@ -1,7 +1,7 @@
 {
   "name": "tennis-score-tracker-multigame",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.4.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,7 +10,9 @@
   },
   "dependencies": {
     "react": "19.3.1",
-    "react-dom": "19.3.1"
+    "react-dom": "19.3.1",
+    "@supabase/supabase-js": "2.119.0",
+    "qrcode.react": "4.2.0"
   },
   "devDependencies": {
     "@types/react": "19.3.0",

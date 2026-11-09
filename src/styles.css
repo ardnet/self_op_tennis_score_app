@@ -225,3 +225,26 @@ button:disabled { cursor: not-allowed; }
   .court-side-card { min-width: 102px; padding: 9px; }
   .tie-rotation-top { gap: 8px; }
 }
+
+/* v0.4.0 Live Scoreboard controller */
+.live-setup-panel { gap: 14px; }
+.live-setup-panel h2 { margin-top: 4px; }
+.live-ready-row { display: flex; align-items: center; gap: 8px; color: #86efac; font-size: 12px; }
+.live-dot-small { width: 9px; height: 9px; flex: 0 0 9px; display: inline-block; border-radius: 50%; background: #22c55e; box-shadow: 0 0 10px rgba(34,197,94,.75); }
+.live-dot-small.syncing { background: #38bdf8; box-shadow: 0 0 10px rgba(56,189,248,.65); }
+.live-dot-small.offline { background: #f59e0b; box-shadow: 0 0 10px rgba(245,158,11,.65); }
+.live-link-details { display: grid; gap: 10px; min-width: 0; }
+.live-code { display: flex; justify-content: space-between; align-items: end; gap: 10px; padding: 10px 12px; border: 1px solid #334155; border-radius: 12px; background: #0f172a; }
+.live-code small { margin: 0; }
+.live-code strong { font-size: 20px; letter-spacing: .12em; }
+.live-url { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #7dd3fc; font-size: 11px; }
+.live-open-link { display: grid; place-items: center; text-decoration: none; }
+.qr-details { border: 1px dashed #475569; border-radius: 12px; padding: 10px; text-align: center; }
+.qr-details summary { cursor: pointer; font-size: 12px; font-weight: 900; }
+.qr-box { width: fit-content; margin: 12px auto 0; padding: 10px; border-radius: 12px; background: white; line-height: 0; }
+.live-error { border: 1px solid rgba(245,158,11,.5); border-radius: 12px; padding: 9px 11px; color: #fde68a; background: rgba(120,53,15,.22); font-size: 11px; line-height: 1.45; }
+.live-controller-bar { margin-bottom: 12px; border: 1px solid #166534; border-radius: 14px; background: rgba(20,83,45,.2); overflow: hidden; }
+.live-controller-bar > summary { min-height: 42px; padding: 9px 11px; display: flex; align-items: center; gap: 7px; list-style: none; cursor: pointer; color: #bbf7d0; font-size: 10px; font-weight: 900; }
+.live-controller-bar > summary::-webkit-details-marker { display: none; }
+.live-controller-bar > summary span:last-child { margin-left: auto; color: #94a3b8; font-weight: 700; }
+.live-controller-body { display: grid; gap: 10px; padding: 12px; border-top: 1px solid rgba(34,197,94,.25); }

@@ -1,207 +1,111 @@
-# Tennis Score Tracker — Multi-Game MVP
+# Tennis Score Tracker — Multi-Game MVP v0.4.0
 
-React + TypeScript + Vite implementation of the extended Phase 1 Tennis Score Tracker.
+Mobile-first React + TypeScript tennis scoring app for recreational Singles and Doubles, now with an optional realtime Live Scoreboard that can be opened on a TV, tablet, laptop or another phone.
 
-## What changed from the single-Game MVP
+## Core scoring features
 
-This version supports a fixed session of **2–10 Games** while retaining all existing Game-level scoring behaviour.
+- Singles and Doubles.
+- Standard tennis scoring: 0, 15, 30, 40, Deuce, Advantage, Game.
+- Unlimited or limited Deuce.
+- Fixed 2–10 Game sessions.
+- Draw or configurable Final Tie-Break when Games finish tied.
+- Singles and Doubles serving rotation.
+- Final Tie-Break 1-then-2-point serving rotation.
+- Dynamic IN/OUT buttons based on the current server.
+- Tie-Break Deuce/Ad court guidance and Change Ends alerts.
+- Session/Game/Tie-Break active timers.
+- Pause, between-Game breaks and Undo.
+- Point history and final result summary.
+- Local browser persistence.
 
-### Setup
+## Live Scoreboard v0.4.0
 
-- Singles or Doubles
-- Player names
-- Unlimited or Limited Deuce (1–10)
-- Fixed total Games: 2–10
-- Preferred Games winning margin: 1 or 2
-- If the final Games score is tied:
-  - Finish as DRAW, or
-  - Use a Final Tie-Break
-- Final Tie-Break configuration:
-  - Target / maximum point: 5–10
-  - Winning margin: 1 or 2
-  - If both sides reach the target equally:
-    - Unlimited until margin is reached
-    - Sudden Death
-    - Make it DRAW
+Before LET'S PLAY, the user can optionally create a unique live scoreboard.
 
-### Serving
+The controller receives:
 
-Singles alternates the server by Game.
+- unique public match code,
+- scoreboard URL,
+- Copy Link,
+- Open link,
+- QR code.
 
-For Doubles, setup captures:
+The public scoreboard is read-only and shows:
 
-- Which team serves Game 1
-- First server on the Player team
-- First server on the Opponent team
+- waiting state before the match,
+- team/player names,
+- Games and point score,
+- current server,
+- Deuce/Advantage,
+- paused and between-Game states,
+- Final Tie-Break score,
+- Tie-Break server,
+- Deuce/Ad court,
+- Change Ends guidance,
+- elapsed active time,
+- final result.
 
-The app then rotates servers automatically. Example:
+Live links expire automatically 24 hours after match completion, or 24 hours after creation if never started. The controller can also close the link manually.
 
-```text
-Player 1 → Opponent 2 → Player 2 → Opponent 1 → repeat
-```
+## Architecture
 
-### During play
+- Frontend: React + TypeScript + Vite, hosted on Netlify.
+- Local match state/scoring remains authoritative on the scoring phone.
+- Protected live-session writes: Netlify Functions.
+- Realtime live-state storage/subscription: Supabase.
+- Public scoreboard: `/scoreboard/<MATCH_CODE>`.
 
-- Standard tennis scoring: 0 → 15 → 30 → 40 → Deuce → Advantage → Game
-- IN = the **current serving side** wins the point
-- OUT = the **receiving side** wins the point
-- Large scoring controls for on-court use
-- Undo
-- Pause / Continue
-- Stop confirmation behind Pause
-- Session timer
-- Individual Game timer
-- Current clock
-- Current Game number and overall Games score
+The scoring app continues locally if the network disconnects. Live synchronisation retries when connectivity returns.
 
-### Between Games
-
-Each Game stops automatically when won.
-
-- Session timer stops
-- Game timer stops
-- Break time is not counted
-- Shows Game winner, duration, Games tally and next server
-- `UNDO LAST POINT` can reopen the completed Game
-- `CONTINUE TO GAME N` starts the next Game and resumes active timing
-
-### Final Tie-Break
-
-If all configured Games finish tied and Final Tie-Break is selected, the app pauses before starting the Tie-Break.
-
-The Tie-Break has its own active timer and point history. It also follows tennis Tie-Break serving rotation:
-
-- Point 1 is served by the **next scheduled server** from the existing Game rotation.
-- After Point 1, each subsequent server serves **two consecutive points**.
-- Singles follows `A → B,B → A,A → B,B → ...`.
-- Doubles continues the established four-player order, for example `Max → Ardi → Zac → Sinner`, using the same 1-then-2-point rhythm.
-- The Tie-Break screen shows the current individual server and team/side.
-- **IN** awards the point to the current server's side; **OUT** awards it to the receiving side.
-- The upcoming serve is labelled **Deuce Court (Right)** or **Ad Court (Left)**.
-- The UI warns when players should change ends after Tie-Break points **6, 12, 18, ...**.
-
-### Session Result
-
-The final result screen includes:
-
-- Winner or DRAW
-- Games score
-- Final Tie-Break score when applicable
-- Total active playing time
-- Per-Game winner
-- Per-Game server
-- Per-Game duration
-- Full point history for every Game
-- Full Final Tie-Break point history
-- Undo last point
-
-## Important Tie-Break interpretation
-
-There was one logical conflict in the discussed requirements:
-
-- `7–6 should finish even when the configured margin is 2`
-- but also `7–7 should trigger the configured equal-at-maximum resolution`
-
-Those two rules cannot both occur naturally because if 7–6 ends immediately, 7–7 can never be reached.
-
-To keep the approved **7–7 resolution options functional**, this implementation makes the selected margin binding at the target:
-
-- Target 7, margin 1: `7–6` wins.
-- Target 7, margin 2: `7–6` continues.
-- If it becomes `7–7`, the selected resolution is applied:
-  - Unlimited
-  - Sudden Death
-  - DRAW
-
-This behaviour is isolated in `src/domain/scoring.ts`, so it is easy to change later if desired.
-
-## Technology
-
-- React
-- TypeScript
-- Vite
-- Browser `localStorage`
-- No backend required
-
-The tennis scoring logic and serving rotation are kept outside React so they can be reused later for native iOS, Android, Apple Watch, Wear OS, or a dedicated scoring device.
-
-## Project structure
-
-```text
-src/
-├── domain/
-│   ├── scoring.ts       Game + Tie-Break scoring engines
-│   ├── session.ts       Game tally + server rotation
-│   └── types.ts         Domain models
-├── storage/
-│   └── localStorage.ts  Browser persistence adapter
-├── App.tsx              Application workflow + UI
-├── main.tsx
-└── styles.css
-```
-
-## Local setup
-
-Use Node.js 22 (recommended) or another Node.js version supported by your installed Vite version.
+## Local install
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open the local URL shown by Vite, normally:
-
-```text
-http://localhost:5173
-```
-
-### Test on a phone on the same Wi-Fi
+For full Live Scoreboard testing including Netlify Functions:
 
 ```bash
-npm run dev -- --host
+npx netlify-cli dev
 ```
 
-Open the `Network` URL shown by Vite from your phone.
+Copy `.env.example` to a local `.env` and fill in your own Supabase values first. Never commit the secret key.
 
-## Production build
+## Production deployment
+
+The existing Netlify deployment is still used. Supabase is added as the live data/realtime service.
+
+Follow the complete setup guide:
+
+**`SETUP_LIVE_SCOREBOARD.md`**
+
+The SQL to run in Supabase is:
+
+**`supabase/live_scoreboard.sql`**
+
+## Environment variables
+
+Browser/build:
+
+```text
+VITE_SUPABASE_URL
+VITE_SUPABASE_PUBLISHABLE_KEY
+```
+
+Netlify Functions/server only:
+
+```text
+SUPABASE_URL
+SUPABASE_SECRET_KEY
+```
+
+Legacy anon/service-role variable names are supported as fallbacks.
+
+## Build
 
 ```bash
 npm run build
 ```
 
-The deployable files will be generated in:
-
-```text
-dist/
-```
-
-## Netlify
-
-This repository includes `netlify.toml`.
-
-For a manual Netlify configuration use:
-
-- Build command: `npm run build`
-- Publish directory: `dist`
-
-## Persistence
-
-The app stores the active setup/session in browser `localStorage` under a new multi-Game storage key. This avoids collisions with the earlier single-Game MVP.
-
-No user account, cloud database, authentication, or API is required in this version.
-
-
-## IN / OUT behaviour
-
-During both normal Games and the Final Tie-Break, the large scoring buttons follow the **current server**:
-
-- **IN** = the serving side wins the point.
-- **OUT** = the receiving side wins the point.
-
-The labels and actual point-award action switch automatically as service rotates. This applies to both Singles and Doubles, including Tie-Break service changes.
-
-Example in Doubles:
-
-- Zac serving → IN = Max / Zac + point; OUT = Ardi / Sinner + point.
-- Sinner serving → IN = Ardi / Sinner + point; OUT = Max / Zac + point.
-
+Netlify configuration is included in `netlify.toml`.

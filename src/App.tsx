@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
+import { QRCodeSVG } from 'qrcode.react'
 import { calculateGameScore, calculateTieBreak, sideName } from './domain/scoring'
 import {
   changesEndsAfterTieBreakPoint,
@@ -32,6 +33,8 @@ import type {
   TieBreakRecord,
 } from './domain/types'
 import { clearState, loadState, saveState } from './storage/localStorage'
+import { closeLiveScoreboard, createLiveScoreboard, loadControllerSession, saveControllerSession, updateLiveScoreboard } from './live/controller'
+import type { LiveControllerSession, LiveScoreboardState, LiveSessionStatus } from './live/types'
 
 const defaultConfig: SessionConfig = {
   mode: 'single',
@@ -82,6 +85,11 @@ function App() {
   const [activeSegment, setActiveSegment] = useState<ActiveSegment>(restored?.activeSegment ?? null)
   const [outcome, setOutcome] = useState<SessionOutcome | null>(restored?.outcome ?? null)
   const [, setClockTick] = useState(0)
+  const [liveSession, setLiveSession] = useState<LiveControllerSession | null>(() => loadControllerSession())
+  const [liveBusy, setLiveBusy] = useState(false)
+  const [liveError, setLiveError] = useState<string | null>(null)
+  const [liveSyncStatus, setLiveSyncStatus] = useState<'idle' | 'syncing' | 'connected' | 'offline'>('idle')
+  const [liveRetryTick, setLiveRetryTick] = useState(0)
 
   const gameScore = useMemo(
     () => calculateGameScore(config, currentGameEvents),
@@ -133,6 +141,58 @@ function App() {
     outcome,
   ])
 
+  useEffect(() => {
+    if (!liveSession || !['server', 'live', 'pause', 'between', 'tiebreak-live', 'result'].includes(screen)) return
+
+    const timer = window.setTimeout(() => {
+      setLiveSyncStatus('syncing')
+      updateLiveScoreboard(liveSession, liveStatusForScreen(), buildLiveScoreboardState())
+        .then(({ expiresAt }) => {
+          const updated = expiresAt === liveSession.expiresAt ? liveSession : { ...liveSession, expiresAt }
+          if (updated !== liveSession) {
+            setLiveSession(updated)
+            saveControllerSession(updated)
+          }
+          setLiveSyncStatus('connected')
+          setLiveError(null)
+        })
+        .catch((error) => {
+          console.warn('Live scoreboard sync failed:', error)
+          setLiveSyncStatus('offline')
+          setLiveError('Live scoreboard reconnecting. Local scoring is still available.')
+        })
+    }, 180)
+
+    return () => window.clearTimeout(timer)
+  }, [
+    liveSession,
+    screen,
+    config,
+    completedGames,
+    currentGameIndex,
+    currentGameEvents,
+    tieBreakEvents,
+    tieBreakRecord,
+    paused,
+    sessionElapsedBeforeRun,
+    segmentElapsedBeforeRun,
+    activeStartedAt,
+    activeSegment,
+    outcome,
+    liveRetryTick,
+  ])
+
+  useEffect(() => {
+    if (!liveSession || liveSyncStatus !== 'offline') return
+    const retry = window.setInterval(() => setLiveRetryTick((value) => value + 1), 5000)
+    const onOnline = () => setLiveRetryTick((value) => value + 1)
+    window.addEventListener('online', onOnline)
+    return () => {
+      window.clearInterval(retry)
+      window.removeEventListener('online', onOnline)
+    }
+  }, [liveSession, liveSyncStatus])
+
   function runningDelta() {
     if (activeStartedAt === null || paused || activeSegment === null) return 0
     return nowMs() - activeStartedAt
@@ -144,6 +204,121 @@ function App() {
 
   function segmentElapsed() {
     return segmentElapsedBeforeRun + runningDelta()
+  }
+
+  function livePhase(): LiveScoreboardState['phase'] {
+    if (screen === 'server') return 'waiting'
+    if (screen === 'live') return 'game'
+    if (screen === 'pause') return 'paused'
+    if (screen === 'between') return 'between'
+    if (screen === 'tiebreak-live') return 'tiebreak'
+    if (screen === 'result') return 'finished'
+    return 'waiting'
+  }
+
+  function buildLiveScoreboardState(): LiveScoreboardState {
+    const phase = livePhase()
+    const isTieBreakPhase = phase === 'tiebreak' || (phase === 'paused' && activeSegment === 'tiebreak')
+    let currentServer: string | null = null
+    let servingSide: Side | null = null
+    let nextServer: string | null = null
+
+    if (phase === 'waiting') {
+      const server = serverForGame(config, 0)
+      currentServer = serverName(config, server)
+      servingSide = servingSideForGame(config, 0)
+    } else if (phase === 'game' || (phase === 'paused' && activeSegment === 'game')) {
+      const server = serverForGame(config, currentGameIndex)
+      currentServer = serverName(config, server)
+      servingSide = servingSideForGame(config, currentGameIndex)
+    } else if (isTieBreakPhase) {
+      const server = tieBreakServerForPoint(config, completedGames.length, tieBreakEvents.length)
+      currentServer = serverName(config, server)
+      servingSide = tieBreakServingSideForPoint(config, completedGames.length, tieBreakEvents.length)
+    } else if (phase === 'between') {
+      const pendingTieBreak = completedGames.length === config.totalGames && tally.player === tally.opponent && config.gamesTieResolution === 'tiebreak'
+      if (pendingTieBreak) {
+        nextServer = serverName(config, tieBreakServerForPoint(config, completedGames.length, 0))
+      } else if (completedGames.length < config.totalGames) {
+        nextServer = serverName(config, serverForGame(config, completedGames.length))
+      }
+    }
+
+    const last = completedGames.at(-1)
+    const betweenMessage = phase === 'between' && last
+      ? `${sideName(config, last.winner)} ${config.mode === 'double' ? 'win' : 'wins'} Game ${last.gameNumber}`
+      : null
+
+    return {
+      version: 1,
+      mode: config.mode,
+      teamPlayer: sideName(config, 'player'),
+      teamOpponent: sideName(config, 'opponent'),
+      totalGames: config.totalGames,
+      currentGame: Math.min(config.totalGames, currentGameIndex + 1),
+      gamesPlayer: tally.player,
+      gamesOpponent: tally.opponent,
+      pointPlayer: gameScore.playerDisplay,
+      pointOpponent: gameScore.opponentDisplay,
+      advantage: gameScore.advantage,
+      deuceCount: gameScore.deuceCount,
+      deuceMode: config.deuceMode,
+      maxDeuce: config.maxDeuce,
+      currentServer,
+      servingSide,
+      phase,
+      segmentLabel: isTieBreakPhase ? 'Final Tie-Break' : phase === 'between' ? 'Between Games' : `Game ${Math.min(config.totalGames, currentGameIndex + 1)} of ${config.totalGames}`,
+      sessionElapsedMs: sessionElapsedBeforeRun,
+      segmentElapsedMs: segmentElapsedBeforeRun,
+      activeStartedAt: (phase === 'game' || phase === 'tiebreak') ? activeStartedAt : null,
+      tieBreakPlayer: isTieBreakPhase || tieBreakRecord ? tieBreakScore.playerPoints : null,
+      tieBreakOpponent: isTieBreakPhase || tieBreakRecord ? tieBreakScore.opponentPoints : null,
+      tieBreakCourtSide: isTieBreakPhase ? tieBreakCourtSide(tieBreakEvents.length) : null,
+      tieBreakPointNumber: isTieBreakPhase ? tieBreakPointNumber(tieBreakEvents.length) : null,
+      changeEndsAfterThisPoint: isTieBreakPhase ? changesEndsAfterTieBreakPoint(tieBreakEvents.length) : false,
+      nextServer,
+      message: phase === 'game' ? (gameScore.suddenDeath ? 'FINAL DEUCE • NEXT POINT WINS' : gameScore.status === 'deuce' ? 'DEUCE' : gameScore.status === 'advantage' ? `Advantage ${sideName(config, gameScore.advantage!)}` : null) : betweenMessage,
+      outcome: phase === 'finished' ? outcome : null,
+    }
+  }
+
+  function liveStatusForScreen(): LiveSessionStatus {
+    if (screen === 'server') return 'waiting'
+    if (screen === 'pause') return 'paused'
+    if (screen === 'between') return 'between'
+    if (screen === 'tiebreak-live') return 'tiebreak'
+    if (screen === 'result') return 'finished'
+    return 'live'
+  }
+
+  async function handleCreateLiveScoreboard() {
+    setLiveBusy(true)
+    setLiveError(null)
+    try {
+      const created = await createLiveScoreboard(buildLiveScoreboardState())
+      setLiveSession(created)
+      setLiveSyncStatus('connected')
+    } catch (error) {
+      setLiveSyncStatus('offline')
+      setLiveError(error instanceof Error ? error.message : 'Unable to create live scoreboard')
+    } finally {
+      setLiveBusy(false)
+    }
+  }
+
+  async function handleCloseLiveScoreboard() {
+    if (!liveSession) return
+    setLiveBusy(true)
+    setLiveError(null)
+    try {
+      await closeLiveScoreboard(liveSession)
+      setLiveSession(null)
+      setLiveSyncStatus('idle')
+    } catch (error) {
+      setLiveError(error instanceof Error ? error.message : 'Unable to close live scoreboard')
+    } finally {
+      setLiveBusy(false)
+    }
   }
 
   function resetSessionProgress() {
@@ -341,18 +516,25 @@ function App() {
   }
 
   function stopSession() {
+    if (liveSession) closeLiveScoreboard(liveSession).catch(() => undefined)
+    setLiveSession(null)
+    saveControllerSession(null)
     resetSessionProgress()
     clearState()
     setScreen('welcome')
   }
 
   function done() {
+    setLiveSession(null)
+    saveControllerSession(null)
     resetSessionProgress()
     clearState()
     setScreen('welcome')
   }
 
   function newSession() {
+    setLiveSession(null)
+    saveControllerSession(null)
     resetSessionProgress()
     setScreen('server')
   }
@@ -365,6 +547,7 @@ function App() {
   return (
     <main className="app-shell">
       <div className="phone-card">
+        {liveSession && screen !== 'server' && <LiveControllerStatus session={liveSession} syncStatus={liveSyncStatus} busy={liveBusy} error={liveError} onClose={handleCloseLiveScoreboard} />}
         {screen === 'welcome' && <Welcome onStart={() => setScreen('mode')} />}
 
         {screen === 'mode' && (
@@ -435,6 +618,11 @@ function App() {
             onChange={setConfig}
             onBack={() => setScreen(config.gamesTieResolution === 'tiebreak' ? 'tiebreak-config' : 'format')}
             onStart={startSession}
+            liveSession={liveSession}
+            liveBusy={liveBusy}
+            liveError={liveError}
+            onCreateLive={handleCreateLiveScoreboard}
+            onCloseLive={handleCloseLiveScoreboard}
           />
         )}
 
@@ -744,11 +932,21 @@ function ServerSetupScreen({
   onChange,
   onBack,
   onStart,
+  liveSession,
+  liveBusy,
+  liveError,
+  onCreateLive,
+  onCloseLive,
 }: {
   config: SessionConfig
   onChange: (config: SessionConfig) => void
   onBack: () => void
   onStart: () => void
+  liveSession: LiveControllerSession | null
+  liveBusy: boolean
+  liveError: string | null
+  onCreateLive: () => void
+  onCloseLive: () => void
 }) {
   const rotation = range(0, Math.min(config.totalGames - 1, 3)).map((gameIndex) => ({
     game: gameIndex + 1,
@@ -791,6 +989,13 @@ function ServerSetupScreen({
         {rotation.map((item) => <div key={item.game}><span>Game {item.game}</span><strong>{item.server}</strong></div>)}
         {config.totalGames > 4 && <small>Rotation continues automatically for the remaining Games.</small>}
       </div>
+      <LiveScoreboardSetupPanel
+        session={liveSession}
+        busy={liveBusy}
+        error={liveError}
+        onCreate={onCreateLive}
+        onClose={onCloseLive}
+      />
       <NavButtons onBack={onBack} onNext={onStart} nextLabel="LET'S PLAY!" />
     </section>
   )
@@ -1129,6 +1334,63 @@ function SessionResultScreen({
         <button className="button button-secondary button-lg" onClick={onDone}>DONE</button>
       </div>
     </section>
+  )
+}
+
+function LiveScoreboardSetupPanel({ session, busy, error, onCreate, onClose }: { session: LiveControllerSession | null; busy: boolean; error: string | null; onCreate: () => void; onClose: () => void }) {
+  return (
+    <div className="panel live-setup-panel">
+      <div>
+        <small className="eyebrow">OPTIONAL</small>
+        <h2>Live Scoreboard</h2>
+        <small>Show this match live on a TV, tablet, laptop or another phone.</small>
+      </div>
+      {!session ? (
+        <button className="button button-secondary" disabled={busy} onClick={onCreate}>{busy ? 'CREATING…' : 'CREATE LIVE SCOREBOARD'}</button>
+      ) : (
+        <>
+          <div className="live-ready-row"><span className="live-dot-small" /><strong>LIVE SCOREBOARD READY</strong></div>
+          <LiveLinkDetails session={session} />
+          <button className="button button-secondary" disabled={busy} onClick={onClose}>REMOVE LIVE SCOREBOARD</button>
+        </>
+      )}
+      {error && <div className="live-error">{error}</div>}
+    </div>
+  )
+}
+
+function LiveControllerStatus({ session, syncStatus, busy, error, onClose }: { session: LiveControllerSession; syncStatus: 'idle' | 'syncing' | 'connected' | 'offline'; busy: boolean; error: string | null; onClose: () => void }) {
+  return (
+    <details className="live-controller-bar">
+      <summary><span className={`live-dot-small ${syncStatus}`} /> LIVE SCOREBOARD · {session.publicCode}<span>{syncStatus === 'offline' ? 'Reconnecting…' : syncStatus === 'syncing' ? 'Syncing…' : 'Connected'}</span></summary>
+      <div className="live-controller-body">
+        <LiveLinkDetails session={session} />
+        {error && <div className="live-error">{error}</div>}
+        <button className="button button-secondary" disabled={busy} onClick={onClose}>CLOSE SCOREBOARD</button>
+      </div>
+    </details>
+  )
+}
+
+function LiveLinkDetails({ session }: { session: LiveControllerSession }) {
+  const copyLink = async () => {
+    try { await navigator.clipboard.writeText(session.scoreboardUrl) } catch { window.prompt('Copy this scoreboard link:', session.scoreboardUrl) }
+  }
+
+  return (
+    <div className="live-link-details">
+      <div className="live-code"><small>Match Code</small><strong>{session.publicCode}</strong></div>
+      <div className="live-url" title={session.scoreboardUrl}>{session.scoreboardUrl}</div>
+      <div className="two-col">
+        <button className="button button-primary" onClick={copyLink}>COPY LINK</button>
+        <a className="button button-secondary live-open-link" href={session.scoreboardUrl} target="_blank" rel="noreferrer">OPEN</a>
+      </div>
+      <details className="qr-details">
+        <summary>SHOW QR CODE</summary>
+        <div className="qr-box"><QRCodeSVG value={session.scoreboardUrl} size={180} bgColor="#ffffff" fgColor="#0f172a" /></div>
+      </details>
+      <small>Link expires automatically 24 hours after the match ends, or 24 hours after creation if the match never starts.</small>
+    </div>
   )
 }
 
