@@ -403,30 +403,35 @@ describe('Undo (§10.4)', () => {
     expect(reopenLastCompletedGame(state, 0)).toBe(state)
   })
 
+  it('re-winning a reopened Game counts its time once in both timers', () => {
+    const won = play(config, startMatch(createMatchState(), 0), points('PPP'), 0, 10 * SEC).state
+    let state = addGamePoint(config, won, 'player', 30 * SEC).state // 30 s Game
+    state = reopenLastCompletedGame(state, 100 * SEC)
+    state = addGamePoint(config, state, 'player', 105 * SEC).state
+    expect(state.completedGames[0].durationMs).toBe(35 * SEC)
+    expect(state.sessionElapsedBeforeRun).toBe(35 * SEC)
+  })
+
   it('the reopened Game keeps its earlier duration on the Game timer', () => {
     const won = play(config, startMatch(createMatchState(), 0), LOVE_GAME_P, 0, 10 * SEC).state // 30 s
     const reopened = reopenLastCompletedGame(won, 100 * SEC)
     expect(segmentElapsed(reopened, 110 * SEC)).toBe(40 * SEC)
   })
 
-  // KNOWN ISSUE (kept from the original App.tsx behaviour, to be confirmed):
-  // the session timer already includes a completed Game's time, but reopening
-  // subtracts it again, so the session timer loses that Game's duration.
-  // Remove `.fails` once fixed.
-  it.fails('KNOWN ISSUE: reopening a Game keeps the session time it already had', () => {
+  it('reopening a Game keeps the session time it already had', () => {
     const won = play(config, startMatch(createMatchState(), 0), LOVE_GAME_P, 0, 10 * SEC).state // 30 s
     expect(sessionElapsed(won, 100 * SEC)).toBe(30 * SEC)
     const reopened = reopenLastCompletedGame(won, 100 * SEC)
-    expect(sessionElapsed(reopened, 110 * SEC)).toBe(40 * SEC) // actually 10 s today
+    expect(sessionElapsed(reopened, 110 * SEC)).toBe(40 * SEC)
   })
 
-  it.fails('KNOWN ISSUE: reopening the Final Tie-Break keeps the session time it already had', () => {
+  it('reopening the Final Tie-Break keeps the session time it already had', () => {
     const tbConfig = makeConfig({ totalGames: 2 })
     let state = playGames(tbConfig, ['player', 'opponent'], 0).state // Games take 0 s
     state = startFinalTieBreak(state, 0)
     state = playTieBreak(tbConfig, state, points('PPPPPPP'), 60 * SEC).state // 60 s
     const reopened = undoFromResult(state, 100 * SEC)
-    expect(sessionElapsed(reopened, 100 * SEC)).toBe(60 * SEC) // actually 0 s today
+    expect(sessionElapsed(reopened, 100 * SEC)).toBe(60 * SEC)
   })
 })
 

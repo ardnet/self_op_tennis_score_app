@@ -339,10 +339,7 @@ export function reopenLastCompletedGame(state: MatchState, now: number): MatchSt
     tieBreakEvents: [],
     tieBreakRecord: null,
     outcome: null,
-    // NOTE: kept exactly as the original App.tsx behaviour. See the
-    // "known issue" test in sessionFlow.test.ts: this drops the reopened
-    // Game's duration from the session timer.
-    sessionElapsedBeforeRun: Math.max(0, state.sessionElapsedBeforeRun - last.durationMs),
+    // The session timer already includes this Game's time; keep it and resume.
     segmentElapsedBeforeRun: last.durationMs,
     activeStartedAt: now,
     activeSegment: 'game',
@@ -360,8 +357,7 @@ export function undoFromResult(state: MatchState, now: number): MatchState {
   return {
     ...state,
     tieBreakEvents: record.events.slice(0, -1),
-    // NOTE: same timer behaviour as reopenLastCompletedGame (see known issue test).
-    sessionElapsedBeforeRun: Math.max(0, state.sessionElapsedBeforeRun - record.durationMs),
+    // The session timer already includes the Tie-Break's time; keep it and resume.
     segmentElapsedBeforeRun: record.durationMs,
     tieBreakRecord: null,
     outcome: null,
