@@ -111,3 +111,15 @@ npm run build
 ```
 
 Netlify configuration is included in `netlify.toml`.
+
+## Tests
+
+Unit tests cover the scoring rules in `src/domain/` (Game scoring, Deuce, Final Tie-Break, serving rotation, court side and change of ends). They are grouped by the section numbers of the Product Requirements / UI/UX Specification.
+
+```bash
+npm test               # run once
+npm run test:watch     # re-run on file changes
+npm run test:coverage  # run with a coverage report (HTML in ./coverage)
+```
+
+Some tests use [fast-check](https://fast-check.dev/) to play thousands of random point sequences and confirm rules that must always hold, e.g. undoing the last point restores exactly the previous score.
