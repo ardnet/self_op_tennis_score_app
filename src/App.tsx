@@ -7,6 +7,7 @@ import {
   clampWhole,
   gamesTally,
   nextTieBreakEndChangeAt,
+  pointWinnerForCall,
   serverForGame,
   serverName,
   servingSideForGame,
@@ -16,6 +17,8 @@ import {
   tieBreakServingOrder,
   tieBreakServingSideForPoint,
 } from './domain/session'
+import * as flow from './domain/sessionFlow'
+import type { FlowEffect, MatchState } from './domain/sessionFlow'
 import type {
   ActiveSegment,
   DeuceMode,
@@ -71,20 +74,25 @@ function formatDuration(ms: number) {
 function App() {
   const restored = useMemo(() => loadState(), [])
 
-  const [screen, setScreen] = useState<Screen>(restored?.screen ?? 'welcome')
   const [config, setConfig] = useState<SessionConfig>(restored?.config ?? defaultConfig)
-  const [completedGames, setCompletedGames] = useState<GameRecord[]>(restored?.completedGames ?? [])
-  const [currentGameIndex, setCurrentGameIndex] = useState(restored?.currentGameIndex ?? 0)
-  const [currentGameEvents, setCurrentGameEvents] = useState<Side[]>(restored?.currentGameEvents ?? [])
-  const [tieBreakEvents, setTieBreakEvents] = useState<Side[]>(restored?.tieBreakEvents ?? [])
-  const [tieBreakRecord, setTieBreakRecord] = useState<TieBreakRecord | null>(restored?.tieBreakRecord ?? null)
-  const [paused, setPaused] = useState(restored?.paused ?? false)
-  const [stopConfirm, setStopConfirm] = useState(restored?.stopConfirm ?? false)
-  const [sessionElapsedBeforeRun, setSessionElapsedBeforeRun] = useState(restored?.sessionElapsedBeforeRun ?? 0)
-  const [segmentElapsedBeforeRun, setSegmentElapsedBeforeRun] = useState(restored?.segmentElapsedBeforeRun ?? 0)
-  const [activeStartedAt, setActiveStartedAt] = useState<number | null>(restored?.activeStartedAt ?? null)
-  const [activeSegment, setActiveSegment] = useState<ActiveSegment>(restored?.activeSegment ?? null)
-  const [outcome, setOutcome] = useState<SessionOutcome | null>(restored?.outcome ?? null)
+  const [match, setMatch] = useState<MatchState>(() => flow.restoreMatchState(restored))
+  const {
+    screen,
+    completedGames,
+    currentGameIndex,
+    currentGameEvents,
+    tieBreakEvents,
+    tieBreakRecord,
+    paused,
+    stopConfirm,
+    sessionElapsedBeforeRun,
+    segmentElapsedBeforeRun,
+    activeStartedAt,
+    activeSegment,
+    outcome,
+  } = match
+  const setScreen = (next: Screen) => setMatch((current) => ({ ...current, screen: next }))
+  const setStopConfirm = (value: boolean) => setMatch((current) => flow.setStopConfirm(current, value))
   const [, setClockTick] = useState(0)
   const [liveSession, setLiveSession] = useState<LiveControllerSession | null>(() => loadControllerSession())
   const [liveBusy, setLiveBusy] = useState(false)
@@ -108,39 +116,9 @@ function App() {
   }, [])
 
   useEffect(() => {
-    const snapshot: PersistedAppState = {
-      screen,
-      config,
-      completedGames,
-      currentGameIndex,
-      currentGameEvents,
-      tieBreakEvents,
-      tieBreakRecord,
-      paused,
-      stopConfirm,
-      sessionElapsedBeforeRun,
-      segmentElapsedBeforeRun,
-      activeStartedAt,
-      activeSegment,
-      outcome,
-    }
+    const snapshot: PersistedAppState = { ...match, config }
     saveState(snapshot)
-  }, [
-    screen,
-    config,
-    completedGames,
-    currentGameIndex,
-    currentGameEvents,
-    tieBreakEvents,
-    tieBreakRecord,
-    paused,
-    stopConfirm,
-    sessionElapsedBeforeRun,
-    segmentElapsedBeforeRun,
-    activeStartedAt,
-    activeSegment,
-    outcome,
-  ])
+  }, [match, config])
 
   useEffect(() => {
     if (!liveSession || !['server', 'live', 'pause', 'between', 'tiebreak-live', 'result'].includes(screen)) return
@@ -194,17 +172,12 @@ function App() {
     }
   }, [liveSession, liveSyncStatus])
 
-  function runningDelta() {
-    if (activeStartedAt === null || paused || activeSegment === null) return 0
-    return nowMs() - activeStartedAt
-  }
-
   function sessionElapsed() {
-    return sessionElapsedBeforeRun + runningDelta()
+    return flow.sessionElapsed(match, nowMs())
   }
 
   function segmentElapsed() {
-    return segmentElapsedBeforeRun + runningDelta()
+    return flow.segmentElapsed(match, nowMs())
   }
 
   function livePhase(): LiveScoreboardState['phase'] {
@@ -324,30 +297,36 @@ function App() {
     }
   }
 
-  function resetSessionProgress() {
-    setCompletedGames([])
-    setCurrentGameIndex(0)
-    setCurrentGameEvents([])
-    setTieBreakEvents([])
-    setTieBreakRecord(null)
-    setPaused(false)
-    setStopConfirm(false)
-    setSessionElapsedBeforeRun(0)
-    setSegmentElapsedBeforeRun(0)
-    setActiveStartedAt(null)
-    setActiveSegment(null)
-    setOutcome(null)
+  function reportEffects(effects: FlowEffect[]) {
+    for (const effect of effects) {
+      if (effect.type === 'game_completed') {
+        trackEvent('game_completed', {
+          game_number: effect.record.gameNumber,
+          winner_side: effect.record.winner,
+          had_deuce: effect.deuceCount > 0,
+          deuce_count: effect.deuceCount,
+        })
+      } else if (effect.type === 'match_completed') {
+        trackEvent('match_completed', {
+          play_mode: config.mode,
+          games_played: effect.gamesPlayed,
+          used_tiebreak: effect.usedTieBreak,
+          draw: effect.draw,
+          duration_seconds: Math.floor(effect.durationMs / 1000),
+        })
+      } else if (effect.type === 'undo') {
+        trackEvent('undo_used', { stage: effect.stage })
+      }
+    }
   }
 
-  function beginGame(gameIndex: number) {
-    setCurrentGameIndex(gameIndex)
-    setCurrentGameEvents([])
-    setSegmentElapsedBeforeRun(0)
-    setPaused(false)
-    setStopConfirm(false)
-    setActiveStartedAt(nowMs())
-    setActiveSegment('game')
-    setScreen('live')
+  function applyResult(result: flow.FlowResult) {
+    setMatch(result.state)
+    reportEffects(result.effects)
+  }
+
+  function resetSessionProgress() {
+    setMatch((current) => flow.resetProgress(current))
   }
 
   function startSession() {
@@ -358,84 +337,15 @@ function App() {
       live_scoreboard_enabled: Boolean(liveSession),
       tie_resolution: config.gamesTieResolution,
     })
-    resetSessionProgress()
-    setCurrentGameIndex(0)
-    setActiveStartedAt(nowMs())
-    setActiveSegment('game')
-    setScreen('live')
+    setMatch((current) => flow.startMatch(current, nowMs()))
   }
 
   function addGamePoint(side: Side) {
-    const nextEvents = [...currentGameEvents, side]
-    const nextScore = calculateGameScore(config, nextEvents)
-    setCurrentGameEvents(nextEvents)
-
-    if (!nextScore.winner) return
-
-    const delta = runningDelta()
-    const gameDuration = segmentElapsedBeforeRun + delta
-    const newSessionElapsed = sessionElapsedBeforeRun + delta
-    const record: GameRecord = {
-      gameNumber: currentGameIndex + 1,
-      server: serverForGame(config, currentGameIndex),
-      events: nextEvents,
-      winner: nextScore.winner,
-      durationMs: gameDuration,
-    }
-    const nextRecords = [...completedGames, record]
-    const nextTally = gamesTally(nextRecords)
-
-    trackEvent('game_completed', {
-      game_number: record.gameNumber,
-      winner_side: record.winner,
-      had_deuce: nextScore.deuceCount > 0,
-      deuce_count: nextScore.deuceCount,
-    })
-
-    setCompletedGames(nextRecords)
-    setSessionElapsedBeforeRun(newSessionElapsed)
-    setSegmentElapsedBeforeRun(0)
-    setActiveStartedAt(null)
-    setActiveSegment(null)
-    setPaused(false)
-
-    if (nextRecords.length < config.totalGames) {
-      setScreen('between')
-      return
-    }
-
-    if (nextTally.player !== nextTally.opponent) {
-      const winner = nextTally.player > nextTally.opponent ? 'player' : 'opponent'
-      setOutcome({ winner, draw: false, decidedBy: 'games' })
-      trackEvent('match_completed', {
-        play_mode: config.mode,
-        games_played: nextRecords.length,
-        used_tiebreak: false,
-        draw: false,
-        duration_seconds: Math.floor(newSessionElapsed / 1000),
-      })
-      setScreen('result')
-      return
-    }
-
-    if (config.gamesTieResolution === 'draw') {
-      setOutcome({ winner: null, draw: true, decidedBy: 'games-draw' })
-      trackEvent('match_completed', {
-        play_mode: config.mode,
-        games_played: nextRecords.length,
-        used_tiebreak: false,
-        draw: true,
-        duration_seconds: Math.floor(newSessionElapsed / 1000),
-      })
-      setScreen('result')
-      return
-    }
-
-    setScreen('between')
+    applyResult(flow.addGamePoint(config, match, side, nowMs()))
   }
 
   function startNextGame() {
-    beginGame(completedGames.length)
+    setMatch((current) => flow.startNextGame(current, nowMs()))
   }
 
   function startFinalTieBreak() {
@@ -444,118 +354,32 @@ function App() {
       winning_margin: config.tieBreakMargin,
       equal_resolution: config.tieBreakEqualResolution,
     })
-    setTieBreakEvents([])
-    setTieBreakRecord(null)
-    setSegmentElapsedBeforeRun(0)
-    setPaused(false)
-    setStopConfirm(false)
-    setActiveStartedAt(nowMs())
-    setActiveSegment('tiebreak')
-    setScreen('tiebreak-live')
+    setMatch((current) => flow.startFinalTieBreak(current, nowMs()))
   }
 
   function addTieBreakPoint(side: Side) {
-    const nextEvents = [...tieBreakEvents, side]
-    const nextScore = calculateTieBreak(config, nextEvents)
-    setTieBreakEvents(nextEvents)
-
-    if (!nextScore.winner && !nextScore.draw) return
-
-    const delta = runningDelta()
-    const tieBreakDuration = segmentElapsedBeforeRun + delta
-    const newSessionElapsed = sessionElapsedBeforeRun + delta
-    const record: TieBreakRecord = {
-      events: nextEvents,
-      durationMs: tieBreakDuration,
-      winner: nextScore.winner,
-      draw: nextScore.draw,
-    }
-
-    setTieBreakRecord(record)
-    setSessionElapsedBeforeRun(newSessionElapsed)
-    setSegmentElapsedBeforeRun(0)
-    setActiveStartedAt(null)
-    setActiveSegment(null)
-    setPaused(false)
-
-    if (nextScore.draw) {
-      setOutcome({ winner: null, draw: true, decidedBy: 'tiebreak-draw' })
-    } else {
-      setOutcome({ winner: nextScore.winner, draw: false, decidedBy: 'tiebreak' })
-    }
-    trackEvent('match_completed', {
-      play_mode: config.mode,
-      games_played: completedGames.length,
-      used_tiebreak: true,
-      draw: nextScore.draw,
-      duration_seconds: Math.floor(newSessionElapsed / 1000),
-    })
-    setScreen('result')
+    applyResult(flow.addTieBreakPoint(config, match, side, nowMs()))
   }
 
   function pauseActivePlay() {
     trackEvent('pause_used', { stage: activeSegment === 'tiebreak' ? 'tiebreak' : 'game' })
-    const delta = runningDelta()
-    setSessionElapsedBeforeRun((value) => value + delta)
-    setSegmentElapsedBeforeRun((value) => value + delta)
-    setActiveStartedAt(null)
-    setPaused(true)
-    setStopConfirm(false)
-    setScreen('pause')
+    setMatch((current) => flow.pause(current, nowMs()))
   }
 
   function resumeActivePlay() {
-    setPaused(false)
-    setStopConfirm(false)
-    setActiveStartedAt(nowMs())
-    setScreen(activeSegment === 'tiebreak' ? 'tiebreak-live' : 'live')
+    setMatch((current) => flow.resume(current, nowMs()))
   }
 
   function undoCurrentPoint() {
-    if (activeSegment === 'tiebreak') {
-      if (!tieBreakEvents.length) return
-      trackEvent('undo_used', { stage: 'tiebreak' })
-      setTieBreakEvents((events) => events.slice(0, -1))
-      return
-    }
-    if (!currentGameEvents.length) return
-    trackEvent('undo_used', { stage: 'game' })
-    setCurrentGameEvents((events) => events.slice(0, -1))
+    applyResult(flow.undoPoint(match))
   }
 
   function reopenLastCompletedGame() {
-    const last = completedGames.at(-1)
-    if (!last) return
-
-    setCompletedGames((records) => records.slice(0, -1))
-    setCurrentGameIndex(last.gameNumber - 1)
-    setCurrentGameEvents(last.events.slice(0, -1))
-    setTieBreakEvents([])
-    setTieBreakRecord(null)
-    setOutcome(null)
-    setSessionElapsedBeforeRun(Math.max(0, sessionElapsedBeforeRun - last.durationMs))
-    setSegmentElapsedBeforeRun(last.durationMs)
-    setActiveStartedAt(nowMs())
-    setActiveSegment('game')
-    setPaused(false)
-    setStopConfirm(false)
-    setScreen('live')
+    setMatch((current) => flow.reopenLastCompletedGame(current, nowMs()))
   }
 
   function undoFromResult() {
-    if (tieBreakRecord) {
-      setTieBreakEvents(tieBreakRecord.events.slice(0, -1))
-      setSessionElapsedBeforeRun(Math.max(0, sessionElapsedBeforeRun - tieBreakRecord.durationMs))
-      setSegmentElapsedBeforeRun(tieBreakRecord.durationMs)
-      setTieBreakRecord(null)
-      setOutcome(null)
-      setActiveStartedAt(nowMs())
-      setActiveSegment('tiebreak')
-      setPaused(false)
-      setScreen('tiebreak-live')
-      return
-    }
-    reopenLastCompletedGame()
+    setMatch((current) => flow.undoFromResult(current, nowMs()))
   }
 
   function stopSession() {
@@ -583,9 +407,7 @@ function App() {
   }
 
   const lastCompletedGame = completedGames.at(-1) ?? null
-  const allGamesComplete = completedGames.length === config.totalGames
-  const gamesAreTied = allGamesComplete && tally.player === tally.opponent
-  const pendingFinalTieBreak = gamesAreTied && config.gamesTieResolution === 'tiebreak' && !tieBreakRecord && !outcome
+  const pendingFinalTieBreak = flow.isFinalTieBreakPending(config, match)
 
   return (
     <main className="app-shell">
@@ -1486,9 +1308,10 @@ function PointButtons({
   onPlayerPoint: () => void
   onOpponentPoint: () => void
 }) {
-  const outSide: Side = inSide === 'player' ? 'opponent' : 'player'
-  const onInPoint = inSide === 'player' ? onPlayerPoint : onOpponentPoint
-  const onOutPoint = outSide === 'player' ? onPlayerPoint : onOpponentPoint
+  const outSide = pointWinnerForCall(inSide, 'out')
+  const award = (side: Side) => (side === 'player' ? onPlayerPoint : onOpponentPoint)
+  const onInPoint = award(pointWinnerForCall(inSide, 'in'))
+  const onOutPoint = award(outSide)
 
   return (
     <div className="score-buttons">

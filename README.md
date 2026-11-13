@@ -114,7 +114,7 @@ Netlify configuration is included in `netlify.toml`.
 
 ## Tests
 
-Unit tests cover the scoring rules in `src/domain/` (Game scoring, Deuce, Final Tie-Break, serving rotation, court side and change of ends). They are grouped by the section numbers of the Product Requirements / UI/UX Specification.
+Unit tests cover the scoring rules in `src/domain/` (Game scoring, Deuce, Final Tie-Break, serving rotation, court side and change of ends) and the match flow in `src/domain/sessionFlow.ts` (session ending, Draw / Final Tie-Break, Undo, Pause and timers). They are grouped by the section numbers of the Product Requirements / UI/UX Specification.
 
 ```bash
 npm test               # run once
