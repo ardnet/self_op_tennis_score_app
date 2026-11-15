@@ -1,11 +1,11 @@
-# Live Scoreboard Setup — Netlify + Supabase
+# Live Scoreboard Setup — Render + Supabase
 
-This project keeps the existing React/Vite scoring app on Netlify and uses Supabase only for live match storage/realtime updates.
+The React/Vite scoring app is hosted as a Render Static Site. Supabase stores the live match state, sends realtime updates, and runs the Edge Functions that write to it. For the hosting steps see **`DEPLOY_RENDER.md`**.
 
 ## Architecture
 
 - Scoring phone: existing app + local state remains the source of truth.
-- Netlify Functions: protected endpoints create/update/close live scoreboard sessions.
+- Supabase Edge Functions: protected endpoints create/update/close live scoreboard sessions.
 - Supabase: stores the public live scoreboard state and sends realtime updates.
 - TV/spectators: open `/scoreboard/<MATCH_CODE>` and have read-only access.
 
@@ -36,7 +36,7 @@ The SQL creates:
 
 In Supabase **Table Editor**, you should see both tables.
 
-Do not manually add a public write policy. Writes are intentionally performed only by the Netlify Functions.
+Do not manually add a public write policy. Writes are intentionally performed only by the Edge Functions.
 
 ---
 
@@ -54,75 +54,32 @@ You need:
    `sb_secret_...`
 
 The publishable key is used by the browser and is protected by Row Level Security.
-The secret key must only be used by Netlify Functions.
+The secret key is used only by the Edge Functions, which receive it from Supabase automatically. You do not need to copy it anywhere.
 
 Never put the secret key in a variable beginning with `VITE_`.
 
 ---
 
-## 3. Configure Netlify environment variables
+## 3. Deploy the Edge Functions and the app
 
-Open the Netlify project that hosts the Self-Operated Tennis Score.
+Follow **`DEPLOY_RENDER.md`**:
 
-Go to the project's environment variables configuration and add:
+1. Deploy `live-scoreboard-create`, `live-scoreboard-update` and `live-scoreboard-close` with the Supabase CLI.
+2. Create the Render Static Site and set the build variables:
+   - `VITE_SUPABASE_URL` — your Supabase project URL
+   - `VITE_SUPABASE_PUBLISHABLE_KEY` — your `sb_publishable_...` key
 
-### Browser/build variables
-
-`VITE_SUPABASE_URL`
-
-Value: your Supabase project URL.
-
-`VITE_SUPABASE_PUBLISHABLE_KEY`
-
-Value: your `sb_publishable_...` key.
-
-These variables must be available during the Netlify **Build** because Vite embeds `VITE_` variables into the browser bundle.
-
-### Function/server variables
-
-`SUPABASE_URL`
-
-Value: the same Supabase project URL.
-
-`SUPABASE_SECRET_KEY`
-
-Value: your `sb_secret_...` key.
-
-This secret must be available to Netlify **Functions**. Mark it as a secret/sensitive value when Netlify offers that option.
-
-If your Netlify plan does not show variable scopes, using the default/all scopes is acceptable; the important part is that the secret key is never exposed through a `VITE_` variable.
+Vite embeds `VITE_` variables into the browser bundle at build time, so redeploy on Render after changing them.
 
 ### Legacy Supabase projects
 
-The code also supports legacy key names if required:
+The code also supports legacy keys: `VITE_SUPABASE_ANON_KEY` in the browser, and the Edge Functions fall back to `SUPABASE_SERVICE_ROLE_KEY` automatically.
 
-- `VITE_SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY`
-
-Prefer the newer Publishable/Secret keys for a newly created project.
+Prefer the newer Publishable/Secret keys.
 
 ---
 
-## 4. Redeploy after adding environment variables
-
-Environment variables beginning with `VITE_` are injected at build time, so after setting the Netlify variables trigger a new production deploy.
-
-Expected Netlify build settings are already included in `netlify.toml`:
-
-- Build command: `npm run build`
-- Publish directory: `dist`
-- Functions directory: `netlify/functions`
-- SPA redirect for `/scoreboard/*`
-
-Netlify should deploy these functions:
-
-- `live-scoreboard-create`
-- `live-scoreboard-update`
-- `live-scoreboard-close`
-
----
-
-## 5. First production test
+## 4. First production test
 
 After deployment:
 
@@ -156,7 +113,7 @@ Also test:
 
 ---
 
-## 6. Link lifetime
+## 5. Link lifetime
 
 The implemented rules are:
 
@@ -171,7 +128,7 @@ Old database rows do not need to be deleted immediately to become inaccessible. 
 
 ---
 
-## 7. Connection-loss behaviour
+## 6. Connection-loss behaviour
 
 The main scoring app continues working locally if internet connectivity is lost.
 
@@ -186,7 +143,7 @@ When connectivity returns, the latest complete state is synchronised.
 
 ---
 
-## 8. Local development
+## 7. Local development
 
 Install dependencies:
 
@@ -200,40 +157,36 @@ For the normal app only:
 npm run dev
 ```
 
-The live-scoreboard creation endpoints are Netlify Functions, so for full local testing use Netlify Dev.
+With `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` in a local `.env`, the local app calls the deployed Edge Functions, so the Live Scoreboard works with plain `npm run dev`. See `DEPLOY_RENDER.md` → *Local development* for running the functions locally.
 
-Create a local `.env` or configure the same environment variables through Netlify CLI, then run:
-
-```bash
-npx netlify-cli dev
-```
-
-Do not commit a local `.env` containing the Supabase secret key.
+Never put the Supabase secret key in `.env` or in any `VITE_` variable.
 
 ---
 
-## 9. Security model
+## 8. Security model
 
 Public viewers receive only read access to active scoreboard sessions.
 
 The public URL does not contain the controller token.
 
-The scoring phone stores its controller token locally and sends it only to Netlify Functions. Netlify Functions hash/verify the token and use the Supabase server secret to perform writes.
+The scoring phone stores its controller token locally and sends it only to the Edge Functions. They hash/verify the token and use the Supabase secret key to perform writes.
 
 The Supabase secret key never enters the Vite/browser bundle.
 
 ---
 
-## 10. Files added for this feature
+## 9. Files added for this feature
 
 - `src/live/LiveScoreboard.tsx`
 - `src/live/controller.ts`
 - `src/live/supabase.ts`
 - `src/live/types.ts`
 - `src/liveScoreboard.css`
-- `netlify/functions/live-scoreboard-create.mjs`
-- `netlify/functions/live-scoreboard-update.mjs`
-- `netlify/functions/live-scoreboard-close.mjs`
-- `netlify/lib/supabase-admin.mjs`
+- `supabase/functions/live-scoreboard-create/index.ts`
+- `supabase/functions/live-scoreboard-update/index.ts`
+- `supabase/functions/live-scoreboard-close/index.ts`
+- `supabase/functions/_shared/live.ts` (endpoint logic, unit-tested in `live.test.ts`)
+- `supabase/functions/_shared/admin.ts`
+- `supabase/config.toml`
 - `supabase/live_scoreboard.sql`
 - `.env.example`

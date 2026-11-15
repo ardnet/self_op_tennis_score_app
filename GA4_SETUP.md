@@ -1,8 +1,8 @@
 # GA4 Setup — Self-Operated Tennis Score Web App
 
-## Netlify
+## Render
 
-Add this environment variable:
+Add this environment variable to the Render Static Site (**Environment**):
 
 ```text
 VITE_GA_MEASUREMENT_ID=G-SYX4DFTVSX
