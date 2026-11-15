@@ -65,6 +65,17 @@ export function sideForServer(server: ServerId): Side {
   return server === 'player1' || server === 'player2' ? 'player' : 'opponent'
 }
 
+export type PointCall = 'in' | 'out'
+
+/**
+ * IN / OUT follow the current server's side (§3, §8.3):
+ * IN awards the point to the serving side, OUT to the receiving side.
+ */
+export function pointWinnerForCall(servingSide: Side, call: PointCall): Side {
+  if (call === 'in') return servingSide
+  return servingSide === 'player' ? 'opponent' : 'player'
+}
+
 /**
  * Tie-break serving follows the standard 1-then-2 point rhythm.
  * Point 1 is served by the next scheduled Game server.
