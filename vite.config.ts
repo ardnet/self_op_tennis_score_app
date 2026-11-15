@@ -5,11 +5,11 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   test: {
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'supabase/functions/**/*.test.ts'],
     environment: 'node',
     coverage: {
       provider: 'v8',
-      include: ['src/domain/**/*.ts'],
+      include: ['src/domain/**/*.ts', 'supabase/functions/_shared/live.ts'],
       exclude: ['src/**/*.test.ts', 'src/**/testUtils.ts', 'src/domain/types.ts'],
       reporter: ['text', 'html'],
     },

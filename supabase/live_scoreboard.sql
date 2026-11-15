@@ -50,7 +50,7 @@ using (
 );
 
 -- No anon/authenticated policies are created for live_scoreboard_controller_tokens.
--- Netlify Functions use the Supabase secret/service key and can access it server-side.
+-- The Supabase Edge Functions use the secret key and can access it server-side.
 
 -- Enable Postgres Changes for the public scoreboard table if needed.
 do $$
