@@ -51,9 +51,9 @@ Live links expire automatically 24 hours after match completion, or 24 hours aft
 
 ## Architecture
 
-- Frontend: React + TypeScript + Vite, hosted on Netlify.
+- Frontend: React + TypeScript + Vite, hosted as a Render Static Site.
 - Local match state/scoring remains authoritative on the scoring phone.
-- Protected live-session writes: Netlify Functions.
+- Protected live-session writes: Supabase Edge Functions (`supabase/functions/`).
 - Realtime live-state storage/subscription: Supabase.
 - Public scoreboard: `/scoreboard/<MATCH_CODE>`.
 
@@ -66,51 +66,34 @@ npm install
 npm run dev
 ```
 
-For full Live Scoreboard testing including Netlify Functions:
-
-```bash
-npx netlify-cli dev
-```
-
-Copy `.env.example` to a local `.env` and fill in your own Supabase values first. Never commit the secret key.
+Copy `.env.example` to a local `.env` and fill in your Supabase URL and publishable key. The local app then uses the deployed Live Scoreboard functions.
 
 ## Production deployment
 
-The existing Netlify deployment is still used. Supabase is added as the live data/realtime service.
+- App: Render Static Site, defined in `render.yaml`.
+- Live Scoreboard API: Supabase Edge Functions, deployed with the Supabase CLI.
 
-Follow the complete setup guide:
+Step-by-step guide (including moving from Netlify): **`DEPLOY_RENDER.md`**
 
-**`SETUP_LIVE_SCOREBOARD.md`**
-
-The SQL to run in Supabase is:
-
-**`supabase/live_scoreboard.sql`**
+Live Scoreboard database setup: **`SETUP_LIVE_SCOREBOARD.md`** and **`supabase/live_scoreboard.sql`**
 
 ## Environment variables
 
-Browser/build:
+Render build (browser-safe):
 
 ```text
 VITE_SUPABASE_URL
 VITE_SUPABASE_PUBLISHABLE_KEY
+VITE_GA_MEASUREMENT_ID
 ```
 
-Netlify Functions/server only:
-
-```text
-SUPABASE_URL
-SUPABASE_SECRET_KEY
-```
-
-Legacy anon/service-role variable names are supported as fallbacks.
+The Edge Functions need no variables of their own: Supabase provides `SUPABASE_URL` and the secret key to them automatically.
 
 ## Build
 
 ```bash
 npm run build
 ```
-
-Netlify configuration is included in `netlify.toml`.
 
 ## Tests
 

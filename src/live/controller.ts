@@ -2,10 +2,29 @@ import type { LiveControllerSession, LiveScoreboardState, LiveSessionStatus } fr
 
 const STORAGE_KEY = 'tennis-score-live-controller-v1'
 
-async function postJson<T>(path: string, body: unknown): Promise<T> {
-  const response = await fetch(path, {
+/**
+ * Where the Live Scoreboard API (Supabase Edge Functions) lives.
+ * Defaults to <VITE_SUPABASE_URL>/functions/v1; VITE_LIVE_API_BASE_URL overrides it
+ * (e.g. http://127.0.0.1:54321/functions/v1 when running functions locally).
+ */
+export function liveApiBaseUrl(env: Partial<ImportMetaEnv> = import.meta.env): string {
+  const override = env.VITE_LIVE_API_BASE_URL?.trim()
+  const supabaseUrl = env.VITE_SUPABASE_URL?.trim()
+  const base = override || (supabaseUrl ? `${supabaseUrl.replace(/\/+$/, '')}/functions/v1` : '')
+  return base.replace(/\/+$/, '')
+}
+
+async function postJson<T>(functionName: string, body: unknown): Promise<T> {
+  const base = liveApiBaseUrl()
+  if (!base) throw new Error('Live Scoreboard is not configured (missing VITE_SUPABASE_URL)')
+
+  const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY
+  const response = await fetch(`${base}/${functionName}`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: {
+      'content-type': 'application/json',
+      ...(publishableKey ? { apikey: publishableKey } : {}),
+    },
     body: JSON.stringify(body),
   })
 
@@ -29,7 +48,7 @@ export function saveControllerSession(session: LiveControllerSession | null) {
 }
 
 export async function createLiveScoreboard(initialState: LiveScoreboardState): Promise<LiveControllerSession> {
-  const result = await postJson<LiveControllerSession>('/.netlify/functions/live-scoreboard-create', {
+  const result = await postJson<LiveControllerSession>('live-scoreboard-create', {
     scoreboardState: initialState,
     origin: window.location.origin,
   })
@@ -42,7 +61,7 @@ export async function updateLiveScoreboard(
   status: LiveSessionStatus,
   scoreboardState: LiveScoreboardState,
 ): Promise<{ expiresAt: string }> {
-  return postJson('/.netlify/functions/live-scoreboard-update', {
+  return postJson('live-scoreboard-update', {
     publicCode: session.publicCode,
     controllerToken: session.controllerToken,
     status,
@@ -51,7 +70,7 @@ export async function updateLiveScoreboard(
 }
 
 export async function closeLiveScoreboard(session: LiveControllerSession): Promise<void> {
-  await postJson('/.netlify/functions/live-scoreboard-close', {
+  await postJson('live-scoreboard-close', {
     publicCode: session.publicCode,
     controllerToken: session.controllerToken,
   })

@@ -1,0 +1,14 @@
+# Supabase CLI configuration (only the Edge Function settings are used by this project).
+project_id = "self-operated-tennis-score"
+
+# These functions are called from the browser without a user login. The
+# platform's JWT check does not accept the new sb_publishable_ / sb_secret_
+# keys, so it is turned off; each function checks the controller token itself.
+[functions.live-scoreboard-create]
+verify_jwt = false
+
+[functions.live-scoreboard-update]
+verify_jwt = false
+
+[functions.live-scoreboard-close]
+verify_jwt = false
