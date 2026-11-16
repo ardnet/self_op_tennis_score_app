@@ -19,8 +19,12 @@ export function initAnalytics() {
   initialised = true
 
   window.dataLayer = window.dataLayer || []
-  window.gtag = (...args: unknown[]) => {
-    window.dataLayer!.push(args)
+  // Must be a classic function pushing the `arguments` object, exactly like
+  // Google's snippet. gtag.js ignores plain arrays (e.g. from `...args`), so
+  // an arrow function with rest parameters silently sends nothing.
+  window.gtag = function gtag() {
+    // eslint-disable-next-line prefer-rest-params
+    window.dataLayer!.push(arguments)
   }
 
   window.gtag('js', new Date())
