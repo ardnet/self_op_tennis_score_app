@@ -4,7 +4,7 @@ The app is hosted as a free **Render Static Site** (served from Render's CDN, ne
 The Live Scoreboard API runs as three **Supabase Edge Functions** in the same Supabase project that stores the live scores.
 
 ```text
-Phone (scoring app)  ──HTTPS──▶  Supabase Edge Functions  ──▶  Supabase Postgres
+Phone (scoring app)  ──HTTPS──▶  Supabase Edge Functions  ──▶  Supabase Postgres 
    served by Render              live-scoreboard-create              │
                                  live-scoreboard-update              │ realtime
                                  live-scoreboard-close               ▼
