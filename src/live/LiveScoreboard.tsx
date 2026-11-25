@@ -130,7 +130,7 @@ export default function LiveScoreboard() {
       <section className="tv-statusbar">
         <div className={`tv-live-pill ${connection}`}><span className="tv-dot" />{connection === 'offline' ? 'Reconnecting…' : statusText}</div>
         <div>{isWaiting ? 'Live scoreboard ready' : isTieBreak ? 'FINAL TIE-BREAK' : state.segmentLabel}</div>
-        <div>⏱ {formatDuration(totalElapsed)}</div>
+        <div>{formatDuration(totalElapsed)}</div>
       </section>
 
       {connection === 'offline' && <div className="tv-connection-note">Connection interrupted — showing the last known score.</div>}
@@ -184,8 +184,8 @@ function TeamCard({ side, name, score, server, serverLabel, advantage, winner }:
   return (
     <article className={`tv-team-card ${side} ${winner ? 'winner' : ''}`}>
       <h2>{name}</h2>
-      {winner && <div className="tv-winner-badge">🏆 WINNER</div>}
-      {server && <div className="tv-server-badge">🎾 {server} {serverLabel}</div>}
+      {winner && <div className="tv-winner-badge">WINNER</div>}
+      {server && <div className="tv-server-badge"><span className="tv-ball-dot" aria-hidden="true" />{server} {serverLabel}</div>}
       <div className="tv-score-value">{score}</div>
       {advantage && <div className="tv-adv">ADVANTAGE</div>}
     </article>
@@ -193,5 +193,5 @@ function TeamCard({ side, name, score, server, serverLabel, advantage, winner }:
 }
 
 function ScoreboardMessage({ title, detail }: { title: string; detail: string }) {
-  return <main className="tv-shell tv-message"><div><div className="tv-ball">🎾</div><h1>{title}</h1><p>{detail}</p></div></main>
+  return <main className="tv-shell tv-message"><div><svg className="tv-ball" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10.5" fill="#DFF04A" /><path d="M3.5 7c4.5 2.2 4.5 7.8 0 10M20.5 7c-4.5 2.2-4.5 7.8 0 10" fill="none" stroke="#FFFFFF" strokeWidth="1.5" /></svg><h1>{title}</h1><p>{detail}</p></div></main>
 }
