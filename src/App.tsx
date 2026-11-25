@@ -43,10 +43,10 @@ import { trackEvent } from './analytics'
 const defaultConfig: SessionConfig = {
   mode: 'single',
   names: {
-    player1: 'Player',
-    player2: 'Partner',
-    opponent1: 'Opponent',
-    opponent2: 'Opponent 2',
+    player1: '',
+    player2: '',
+    opponent1: '',
+    opponent2: '',
   },
   deuceMode: 'unlimited',
   maxDeuce: 4,
@@ -572,9 +572,16 @@ function App() {
   )
 }
 
-function Header({ title, subtitle }: { title: string; subtitle?: string }) {
+const SETUP_STEPS = 7
+
+function Header({ title, subtitle, step }: { title: string; subtitle?: string; step?: number }) {
   return (
     <div className="screen-header">
+      {step && (
+        <div className="setup-progress" role="img" aria-label={`Setup step ${step} of ${SETUP_STEPS}`}>
+          {range(1, SETUP_STEPS).map((index) => <span key={index} className={index <= step ? 'done' : ''} />)}
+        </div>
+      )}
       <h1>{title}</h1>
       {subtitle && <p>{subtitle}</p>}
     </div>
@@ -584,12 +591,17 @@ function Header({ title, subtitle }: { title: string; subtitle?: string }) {
 function Welcome({ onStart }: { onStart: () => void }) {
   return (
     <section className="welcome-screen">
-      <div className="ball-mark">🎾</div>
+      <div className="court-hero" aria-hidden="true">
+        <div className="court-hero-inner">
+          <div className="court-hero-net" />
+          <BallIcon className="court-hero-ball" />
+        </div>
+      </div>
       <div>
-        <h1>Self-Operated Tennis Score</h1>
+        <h1>Self-Operated<br />Tennis Score</h1>
         <p>Keep score while you focus on playing.</p>
       </div>
-      <button className="button button-primary button-xl" onClick={onStart}>START</button>
+      <button className="button button-primary button-xl" onClick={onStart}>Start</button>
     </section>
   )
 }
@@ -607,10 +619,10 @@ function ModeScreen({
 }) {
   return (
     <section className="screen-stack">
-      <Header title="Choose Play Mode" subtitle="How are you playing today?" />
+      <Header step={1} title="Choose Play Mode" subtitle="How are you playing today?" />
       <Choice selected={mode === 'single'} title="Singles" subtitle="1 player vs 1 opponent" onClick={() => onSelect('single')} />
       <Choice selected={mode === 'double'} title="Doubles" subtitle="2 players vs 2 opponents" onClick={() => onSelect('double')} />
-      <NavButtons onBack={onBack} onNext={onNext} nextLabel="NEXT" />
+      <NavButtons onBack={onBack} onNext={onNext} nextLabel="Next" />
     </section>
   )
 }
@@ -649,28 +661,26 @@ function NamesScreen({
 
   return (
     <section className="screen-stack">
-      <Header title="Player Names" subtitle={config.mode === 'single' ? 'Enter the two players.' : 'Enter both teams.'} />
+      <Header step={2} title="Player Names" subtitle={config.mode === 'single' ? 'Enter the two players.' : 'Enter both teams.'} />
       {config.mode === 'single' ? (
-        <>
-          <TextField label="Your Name" value={draft.player1} onChange={(value) => setDraft({ ...draft, player1: value })} />
-          <TextField label="Opponent Name" value={draft.opponent1} onChange={(value) => setDraft({ ...draft, opponent1: value })} />
-        </>
+        <div className="names-card">
+          <TextField label="Your Name" placeholder="e.g. Ardi" value={draft.player1} onChange={(value) => setDraft({ ...draft, player1: value })} />
+          <div className="vs-divider"><span>vs</span></div>
+          <TextField label="Opponent Name" placeholder="e.g. Marcus" value={draft.opponent1} onChange={(value) => setDraft({ ...draft, opponent1: value })} />
+        </div>
       ) : (
-        <>
-          <div className="panel">
-            <h2>Your Team</h2>
-            <TextField label="Player 1" value={draft.player1} onChange={(value) => setDraft({ ...draft, player1: value })} />
-            <TextField label="Player 2" value={draft.player2} onChange={(value) => setDraft({ ...draft, player2: value })} />
-          </div>
-          <div className="panel">
-            <h2>Opponent Team</h2>
-            <TextField label="Opponent 1" value={draft.opponent1} onChange={(value) => setDraft({ ...draft, opponent1: value })} />
-            <TextField label="Opponent 2" value={draft.opponent2} onChange={(value) => setDraft({ ...draft, opponent2: value })} />
-          </div>
-        </>
+        <div className="names-card">
+          <h2>Your Team</h2>
+          <TextField label="Player 1" placeholder="Enter a name" value={draft.player1} onChange={(value) => setDraft({ ...draft, player1: value })} />
+          <TextField label="Player 2" placeholder="Enter a name" value={draft.player2} onChange={(value) => setDraft({ ...draft, player2: value })} />
+          <div className="vs-divider"><span>vs</span></div>
+          <h2>Opponent Team</h2>
+          <TextField label="Opponent 1" placeholder="Enter a name" value={draft.opponent1} onChange={(value) => setDraft({ ...draft, opponent1: value })} />
+          <TextField label="Opponent 2" placeholder="Enter a name" value={draft.opponent2} onChange={(value) => setDraft({ ...draft, opponent2: value })} />
+        </div>
       )}
-      {error && <div className="form-error">{error}</div>}
-      <NavButtons onBack={onBack} onNext={next} nextLabel="NEXT" />
+      {error && <div className="form-error" role="alert">{error}</div>}
+      <NavButtons onBack={onBack} onNext={next} nextLabel="Next" />
     </section>
   )
 }
@@ -692,13 +702,17 @@ function DeuceScreen({
 }) {
   return (
     <section className="screen-stack">
-      <Header title="Deuce Setup" subtitle="This rule applies inside every Game." />
+      <Header step={3} title="Deuce Setup" subtitle="This rule applies inside every Game." />
       <Choice selected={mode === 'unlimited'} title="Unlimited Deuce" subtitle="Continue until one side wins by two points." onClick={() => onMode('unlimited')} />
-      <Choice selected={mode === 'limited'} title="Limited Deuce" subtitle="Maximum 1–10 Deuces, then next point wins." onClick={() => onMode('limited')} />
-      {mode === 'limited' && (
-        <SelectField label="Maximum Number of Deuces" value={maxDeuce} onChange={(value) => onMax(clampWhole(value, 1, 10))} values={range(1, 10)} />
-      )}
-      <NavButtons onBack={onBack} onNext={onNext} nextLabel="NEXT" />
+      <div className={`choice-group ${mode === 'limited' ? 'selected' : ''}`}>
+        <Choice selected={mode === 'limited'} title="Limited Deuce" subtitle="Maximum 1–10 Deuces, then next point wins." onClick={() => onMode('limited')} />
+        {mode === 'limited' && (
+          <div className="choice-detail">
+            <Stepper label="Maximum Number of Deuces" value={maxDeuce} min={1} max={10} onChange={(value) => onMax(clampWhole(value, 1, 10))} />
+          </div>
+        )}
+      </div>
+      <NavButtons onBack={onBack} onNext={onNext} nextLabel="Next" />
     </section>
   )
 }
@@ -716,16 +730,16 @@ function GamesScreen({
 }) {
   return (
     <section className="screen-stack">
-      <Header title="How many Games do you want to play?" subtitle="Choose a fixed total number of Games for this session." />
-      <SelectField label="Number of Games" value={totalGames} onChange={(value) => onTotal(clampWhole(value, 2, 10))} values={range(2, 10)} />
+      <Header step={4} title="How many Games do you want to play?" subtitle="Choose a fixed total number of Games for this session." />
+      <Stepper hero label="Number of Games" hint="2 to 10 Games" value={totalGames} min={2} max={10} onChange={(value) => onTotal(clampWhole(value, 2, 10))} />
       <div className="panel future-panel">
         <div>
           <strong>Configure Sets instead?</strong>
           <small>Coming in Phase 2</small>
         </div>
-        <button className="button button-secondary" disabled>SETS</button>
+        <button className="button button-secondary" disabled>Sets</button>
       </div>
-      <NavButtons onBack={onBack} onNext={onNext} nextLabel="NEXT" />
+      <NavButtons onBack={onBack} onNext={onNext} nextLabel="Next" />
     </section>
   )
 }
@@ -747,13 +761,16 @@ function GamesFormatScreen({
 }) {
   return (
     <section className="screen-stack">
-      <Header title="Games Format" subtitle="Configure how the overall Games result is decided." />
-      <SelectField label="How many Games must the winner lead by?" value={margin} onChange={(value) => onMargin(value === 1 ? 1 : 2)} values={[1, 2]} />
-      <InfoBox>Because the number of Games is fixed, play still ends after the configured total. If the final score is not tied, the side with more Games wins even when this preferred margin is not met.</InfoBox>
+      <Header step={5} title="Games Format" subtitle="Configure how the overall Games result is decided." />
+      <div className="panel">
+        <h2>How many Games must the winner lead by?</h2>
+        <Segmented label="How many Games must the winner lead by?" value={margin} values={[1, 2]} onChange={(value) => onMargin(value === 1 ? 1 : 2)} />
+        <InfoBox>Because the number of Games is fixed, play still ends after the configured total. If the final score is not tied, the side with more Games wins even when this preferred margin is not met.</InfoBox>
+      </div>
       <h2 className="section-question">If the Games score is tied when all configured Games are complete:</h2>
       <Choice selected={tieResolution === 'draw'} title="Finish as DRAW" subtitle="End the session with no winner." onClick={() => onTieResolution('draw')} />
       <Choice selected={tieResolution === 'tiebreak'} title="Use Tie-Break" subtitle="Play a final numeric Tie-Break to decide the session." onClick={() => onTieResolution('tiebreak')} />
-      <NavButtons onBack={onBack} onNext={onNext} nextLabel={tieResolution === 'tiebreak' ? 'CONFIGURE TIE-BREAK' : 'PLAY'} />
+      <NavButtons onBack={onBack} onNext={onNext} nextLabel={tieResolution === 'tiebreak' ? 'Configure Tie-Break' : 'Play'} />
     </section>
   )
 }
@@ -779,15 +796,21 @@ function TieBreakConfigScreen({
 }) {
   return (
     <section className="screen-stack">
-      <Header title="Tie-Break Setup" subtitle="Used only when the configured Games finish tied." />
-      <SelectField label="Maximum Tie-Break Point" value={maxPoint} onChange={(value) => onMaxPoint(clampWhole(value, 5, 10))} values={range(5, 10)} />
-      <SelectField label="Tie-Break Winning Margin" value={margin} onChange={(value) => onMargin(value === 1 ? 1 : 2)} values={[1, 2]} />
-      <InfoBox>The selected margin applies at the target. For example, with target 7 and margin 2, 7–6 continues; if it reaches 7–7, the selected equal-score resolution applies.</InfoBox>
+      <Header step={6} title="Tie-Break Setup" subtitle="Used only when the configured Games finish tied." />
+      <div className="panel">
+        <h2>Maximum Tie-Break Point</h2>
+        <ChipRow label="Maximum Tie-Break Point" value={maxPoint} values={range(5, 10)} onChange={(value) => onMaxPoint(clampWhole(value, 5, 10))} />
+        <div className="inline-setting">
+          <span>Tie-Break Winning Margin</span>
+          <Segmented label="Tie-Break Winning Margin" value={margin} values={[1, 2]} onChange={(value) => onMargin(value === 1 ? 1 : 2)} />
+        </div>
+        <InfoBox>The selected margin applies at the target. For example, with target 7 and margin 2, 7–6 continues; if it reaches 7–7, the selected equal-score resolution applies.</InfoBox>
+      </div>
       <h2 className="section-question">If both sides reach the maximum equally:</h2>
       <Choice selected={equalResolution === 'unlimited'} title="Unlimited Until Margin Reached" subtitle={`Continue until one side leads by ${margin}.`} onClick={() => onEqualResolution('unlimited')} />
       <Choice selected={equalResolution === 'sudden-death'} title="Sudden Death" subtitle="The next point wins." onClick={() => onEqualResolution('sudden-death')} />
       <Choice selected={equalResolution === 'draw'} title="Make it DRAW" subtitle="End the session immediately as a draw." onClick={() => onEqualResolution('draw')} />
-      <NavButtons onBack={onBack} onNext={onNext} nextLabel="PLAY" />
+      <NavButtons onBack={onBack} onNext={onNext} nextLabel="Play" />
     </section>
   )
 }
@@ -820,7 +843,7 @@ function ServerSetupScreen({
 
   return (
     <section className="screen-stack">
-      <Header title="Who is going to play first?" subtitle="Set the serving order before Game 1." />
+      <Header step={7} title="Who is going to play first?" subtitle="Set the serving order before Game 1." />
 
       <div className="panel">
         <h2>Which side serves Game 1?</h2>
@@ -861,7 +884,7 @@ function ServerSetupScreen({
         onCreate={onCreateLive}
         onClose={onCloseLive}
       />
-      <NavButtons onBack={onBack} onNext={onStart} nextLabel="LET'S PLAY!" />
+      <NavButtons onBack={onBack} onNext={onStart} nextLabel="Let's play!" />
     </section>
   )
 }
@@ -898,17 +921,19 @@ function LiveGameScreen({
   return (
     <section className="screen-stack compact">
       <TimerStrip sessionElapsed={sessionElapsed} segmentElapsed={gameElapsed} segmentLabel={`Game ${currentGameIndex + 1}`} />
-      <div className="game-progress panel slim-panel">
-        <div><small>GAME {currentGameIndex + 1} OF {config.totalGames}</small><strong>Games: {tally.player}–{tally.opponent}</strong></div>
-        <span className="serve-badge">{serverName(config, server)} SERVES</span>
-      </div>
-      <ScoreBoard config={config} score={score} server={server} />
+      <ScoreBoard
+        config={config}
+        score={score}
+        progress={(
+          <div className="game-progress">
+            <div><small>Game {currentGameIndex + 1} of {config.totalGames}</small><strong>Games: {tally.player}–{tally.opponent}</strong></div>
+            <ServeBadge name={serverName(config, server)} />
+          </div>
+        )}
+      />
       <DeuceBanner config={config} score={score} />
       <PointButtons config={config} inSide={servingSide} onPlayerPoint={onPlayerPoint} onOpponentPoint={onOpponentPoint} />
-      <div className="two-col">
-        <button className="button button-secondary" disabled={!canUndo} onClick={onUndo}>↶ UNDO</button>
-        <button className="button button-secondary" onClick={onPause}>Ⅱ PAUSE</button>
-      </div>
+      <PlayControls canUndo={canUndo} onUndo={onUndo} onPause={onPause} />
     </section>
   )
 }
@@ -944,12 +969,13 @@ function PauseScreen({
 }) {
   return (
     <section className="screen-stack centered">
+      <div className="pause-icon" aria-hidden="true"><PauseIcon /></div>
       <Header title={activeSegment === 'tiebreak' ? 'Tie-Break Paused' : `Game ${gameNumber} Paused`} subtitle="Both active timers are stopped." />
       <div className="timer-pair">
         <TimerCard value={formatDuration(sessionElapsed)} label="Session Time" />
         <TimerCard value={formatDuration(segmentElapsed)} label={activeSegment === 'tiebreak' ? 'Tie-Break Time' : `Game ${gameNumber} Time`} />
       </div>
-      <div className="panel centered">
+      <div className="panel pause-score">
         {activeSegment === 'tiebreak' ? (
           <>
             <strong>{sideName(config, 'player')} {tieBreakScore.playerPoints} — {tieBreakScore.opponentPoints} {sideName(config, 'opponent')}</strong>
@@ -965,17 +991,20 @@ function PauseScreen({
           </>
         )}
       </div>
-      <button className="button button-primary button-lg" onClick={onContinue}>{activeSegment === 'tiebreak' ? 'CONTINUE TIE-BREAK' : `CONTINUE GAME ${gameNumber}`}</button>
-      <button className="button button-secondary" onClick={onStopRequest}>STOP GAME</button>
+      <button className="button button-primary button-lg" onClick={onContinue}>{activeSegment === 'tiebreak' ? 'Continue Tie-Break' : `Continue Game ${gameNumber}`}</button>
+      <button className="button button-secondary" onClick={onStopRequest}>Stop Game</button>
       {stopConfirm && (
-        <div className="panel confirmation">
-          <h2>Stop this game?</h2>
-          <p>The current multi-Game session will be discarded.</p>
-          <div className="two-col">
-            <button className="button button-secondary" onClick={onStopCancel}>Continue</button>
-            <button className="button button-danger" onClick={onStopConfirm}>Stop Game</button>
+        <>
+          <div className="sheet-backdrop" onClick={onStopCancel} />
+          <div className="sheet confirmation" role="dialog" aria-modal="true" aria-labelledby="stop-title">
+            <h2 id="stop-title">Stop this game?</h2>
+            <p>The current multi-Game session will be discarded.</p>
+            <div className="two-col">
+              <button className="button button-secondary" onClick={onStopCancel}>Continue</button>
+              <button className="button button-danger" onClick={onStopConfirm}>Stop Game</button>
+            </div>
           </div>
-        </div>
+        </>
       )}
     </section>
   )
@@ -1006,8 +1035,8 @@ function BetweenGamesScreen({
 
   return (
     <section className="screen-stack">
-      <div className="result-hero">
-        <small>{pendingFinalTieBreak ? 'ALL GAMES COMPLETE' : `GAME ${record.gameNumber} COMPLETE`}</small>
+      <div className={`result-hero ${pendingFinalTieBreak ? 'tied' : ''}`}>
+        <small>{pendingFinalTieBreak ? 'All Games complete' : `Game ${record.gameNumber} complete`}</small>
         {pendingFinalTieBreak ? (
           <>
             <h1>Games Tied {tally.player}–{tally.opponent}</h1>
@@ -1027,17 +1056,19 @@ function BetweenGamesScreen({
       </div>
 
       <div className="panel">
-        {!pendingFinalTieBreak && nextServer && <Summary label="Next Server" value={nextServer} />}
+        {!pendingFinalTieBreak && nextServer && <Summary label="Next Server" value={nextServer} ball />}
         <Summary label="Timer Status" value="Stopped during break" />
         <small>Active time resumes only when you continue.</small>
       </div>
 
       <GameHistory config={config} record={record} score={gameScore} compact />
 
-      <button className="button button-secondary" onClick={onUndo}>↶ UNDO LAST POINT</button>
-      <button className="button button-primary button-xl" onClick={onContinue}>
-        {pendingFinalTieBreak ? 'START FINAL TIE-BREAK' : `CONTINUE TO GAME ${record.gameNumber + 1}`}
-      </button>
+      <div className="sticky-actions">
+        <button className="button button-secondary" onClick={onUndo}><UndoIcon />Undo Last Point</button>
+        <button className="button button-primary button-xl" onClick={onContinue}>
+          {pendingFinalTieBreak ? 'Start Final Tie-Break' : `Continue to Game ${record.gameNumber + 1}`}
+        </button>
+      </div>
     </section>
   )
 }
@@ -1081,45 +1112,42 @@ function TieBreakLiveScreen({
 
   return (
     <section className="screen-stack compact">
-      <div className="result-hero compact-hero"><small>FINAL TIE-BREAK</small><p>Games finished {tally.player}–{tally.opponent}</p></div>
+      <div className="result-hero compact-hero"><small>Final Tie-Break</small><p>Games finished {tally.player}–{tally.opponent}</p></div>
       <TimerStrip sessionElapsed={sessionElapsed} segmentElapsed={tieBreakElapsed} segmentLabel="Tie-Break" />
 
-      <div className="tie-score panel no-pad">
+      <div className="tie-score">
         <TieScoreRow name={sideName(config, 'player')} score={score.playerPoints} />
         <TieScoreRow name={sideName(config, 'opponent')} score={score.opponentPoints} />
       </div>
 
       <div className="panel tie-server-panel">
         <div>
-          <small className="eyebrow">CURRENT SERVER</small>
-          <strong className="tie-server-name">{serverName(config, currentServer)} SERVES</strong>
+          <small className="eyebrow">Current Server</small>
+          <strong className="tie-server-name">{serverName(config, currentServer)} serves</strong>
           <span>{config.mode === 'double' ? `Team: ${sideName(config, servingSide)}` : sideName(config, servingSide)}</span>
         </div>
         <div className="court-side-card">
           <small>Court Side</small>
-          <strong>{courtSide === 'deuce' ? 'DEUCE COURT' : 'AD COURT'}</strong>
+          <strong>{courtSide === 'deuce' ? 'Deuce court' : 'Ad court'}</strong>
           <span>{courtSide === 'deuce' ? 'Right' : 'Left'}</span>
         </div>
       </div>
 
-      <div className="panel tie-rotation-panel">
+      <div className={`panel tie-rotation-panel ${changeEndsAfterThisPoint ? 'ends' : ''}`}>
         <div className="tie-rotation-top">
           <div><small>Tie-Break Point</small><strong>Point {pointNumber}</strong></div>
           <div className="align-right">
             <small>{changeEndsAfterThisPoint ? 'After this point' : 'Next end change'}</small>
-            <strong>{changeEndsAfterThisPoint ? 'CHANGE ENDS' : `At total ${nextEndChange} points`}</strong>
+            <strong>{changeEndsAfterThisPoint ? 'Change ends' : `At total ${nextEndChange} points`}</strong>
           </div>
         </div>
-        {changeEndsAfterThisPoint && <div className="change-ends-banner">CHANGE ENDS AFTER THIS POINT</div>}
+        {changeEndsAfterThisPoint && <div className="change-ends-banner" role="status"><SwapIcon />Change ends after this point</div>}
         <small className="rotation-order">Serving order: {servingOrder}</small>
       </div>
 
       <TieBreakBanner config={config} score={score} />
       <PointButtons config={config} inSide={servingSide} onPlayerPoint={onPlayerPoint} onOpponentPoint={onOpponentPoint} />
-      <div className="two-col">
-        <button className="button button-secondary" disabled={!canUndo} onClick={onUndo}>↶ UNDO</button>
-        <button className="button button-secondary" onClick={onPause}>Ⅱ PAUSE</button>
-      </div>
+      <PlayControls canUndo={canUndo} onUndo={onUndo} onPause={onPause} />
     </section>
   )
 }
@@ -1149,8 +1177,8 @@ function SessionResultScreen({
 
   return (
     <section className="screen-stack">
-      <div className="result-hero">
-        <small>SESSION COMPLETE</small>
+      <div className={`result-hero ${outcome.draw ? '' : 'winner'}`}>
+        <small>Session complete</small>
         <h1>{outcome.draw ? 'DRAW' : `${sideName(config, outcome.winner!)} ${config.mode === 'double' ? 'Win' : 'Wins'}`}</h1>
         <p>
           Games: {tally.player}–{tally.opponent}
@@ -1177,26 +1205,28 @@ function SessionResultScreen({
             config={config}
             record={record}
             score={calculateGameScore(config, record.events)}
+            collapsible
           />
         ))}
         {tieBreakRecord && tieScore && (
-          <div className="panel history-card">
-            <div className="history-title">
-              <div><strong>Final Tie-Break</strong><small>{tieBreakRecord.draw ? 'Draw' : `${sideName(config, tieBreakRecord.winner!)} won`}</small></div>
-              <span>{formatDuration(tieBreakRecord.durationMs)}</span>
-            </div>
-            <div className="history-head"><small>Point history</small><small>{tieScore.history.length} points</small></div>
+          <details className="panel history-card" open>
+            <summary className="history-title">
+              <div><strong>Final Tie-Break</strong><small>{tieBreakRecord.draw ? 'Draw' : `${sideName(config, tieBreakRecord.winner!)} won`} · {tieScore.history.length} points</small></div>
+              <span>{formatDuration(tieBreakRecord.durationMs)}<ChevronIcon /></span>
+            </summary>
             <ol className="point-history">
               {tieScore.history.map((item) => <li key={item.number}><span>{item.number}</span><strong>{item.text}</strong></li>)}
             </ol>
-          </div>
+          </details>
         )}
       </div>
 
-      <button className="button button-secondary" onClick={onUndo}>↶ UNDO LAST POINT</button>
-      <div className="two-col">
-        <button className="button button-primary button-lg" onClick={onNewSession}>NEW SESSION</button>
-        <button className="button button-secondary button-lg" onClick={onDone}>DONE</button>
+      <div className="sticky-actions">
+        <button className="button button-secondary" onClick={onUndo}><UndoIcon />Undo Last Point</button>
+        <div className="two-col nav-buttons nav-buttons-result">
+          <button className="button button-primary button-lg" onClick={onNewSession}>New Session</button>
+          <button className="button button-secondary button-lg" onClick={onDone}>Done</button>
+        </div>
       </div>
     </section>
   )
@@ -1204,19 +1234,19 @@ function SessionResultScreen({
 
 function LiveScoreboardSetupPanel({ session, busy, error, onCreate, onClose }: { session: LiveControllerSession | null; busy: boolean; error: string | null; onCreate: () => void; onClose: () => void }) {
   return (
-    <div className="panel live-setup-panel">
+    <div className={`panel live-setup-panel ${session ? 'ready' : ''}`}>
       <div>
-        <small className="eyebrow">OPTIONAL</small>
+        <small className="eyebrow">Optional</small>
         <h2>Live Scoreboard</h2>
         <small>Show this match live on a TV, tablet, laptop or another phone.</small>
       </div>
       {!session ? (
-        <button className="button button-secondary" disabled={busy} onClick={onCreate}>{busy ? 'CREATING…' : 'CREATE LIVE SCOREBOARD'}</button>
+        <button className="button button-secondary" disabled={busy} onClick={onCreate}>{busy ? 'Creating…' : 'Create Live Scoreboard'}</button>
       ) : (
         <>
-          <div className="live-ready-row"><span className="live-dot-small" /><strong>LIVE SCOREBOARD READY</strong></div>
+          <div className="live-ready-row"><span className="live-dot-small" /><strong>Live Scoreboard ready</strong></div>
           <LiveLinkDetails session={session} />
-          <button className="button button-secondary" disabled={busy} onClick={onClose}>REMOVE LIVE SCOREBOARD</button>
+          <button className="button button-secondary" disabled={busy} onClick={onClose}>Remove Live Scoreboard</button>
         </>
       )}
       {error && <div className="live-error">{error}</div>}
@@ -1227,11 +1257,11 @@ function LiveScoreboardSetupPanel({ session, busy, error, onCreate, onClose }: {
 function LiveControllerStatus({ session, syncStatus, busy, error, onClose }: { session: LiveControllerSession; syncStatus: 'idle' | 'syncing' | 'connected' | 'offline'; busy: boolean; error: string | null; onClose: () => void }) {
   return (
     <details className="live-controller-bar">
-      <summary><span className={`live-dot-small ${syncStatus}`} /> LIVE SCOREBOARD · {session.publicCode}<span>{syncStatus === 'offline' ? 'Reconnecting…' : syncStatus === 'syncing' ? 'Syncing…' : 'Connected'}</span></summary>
+      <summary><span className={`live-dot-small ${syncStatus}`} /> Live Scoreboard · {session.publicCode}<span>{syncStatus === 'offline' ? 'Reconnecting…' : syncStatus === 'syncing' ? 'Syncing…' : 'Connected'}</span></summary>
       <div className="live-controller-body">
         <LiveLinkDetails session={session} />
         {error && <div className="live-error">{error}</div>}
-        <button className="button button-secondary" disabled={busy} onClick={onClose}>CLOSE SCOREBOARD</button>
+        <button className="button button-secondary" disabled={busy} onClick={onClose}>Close Scoreboard</button>
       </div>
     </details>
   )
@@ -1247,12 +1277,12 @@ function LiveLinkDetails({ session }: { session: LiveControllerSession }) {
       <div className="live-code"><small>Match Code</small><strong>{session.publicCode}</strong></div>
       <div className="live-url" title={session.scoreboardUrl}>{session.scoreboardUrl}</div>
       <div className="two-col">
-        <button className="button button-primary" onClick={copyLink}>COPY LINK</button>
-        <a className="button button-secondary live-open-link" href={session.scoreboardUrl} target="_blank" rel="noreferrer">OPEN</a>
+        <button className="button button-primary" onClick={copyLink}>Copy Link</button>
+        <a className="button button-secondary live-open-link" href={session.scoreboardUrl} target="_blank" rel="noreferrer">Open</a>
       </div>
       <details className="qr-details">
-        <summary>SHOW QR CODE</summary>
-        <div className="qr-box"><QRCodeSVG value={session.scoreboardUrl} size={180} bgColor="#ffffff" fgColor="#0f172a" /></div>
+        <summary>Show QR Code</summary>
+        <div className="qr-box"><QRCodeSVG value={session.scoreboardUrl} size={180} bgColor="#ffffff" fgColor="#0F2440" /></div>
       </details>
       <small>Link expires automatically 24 hours after the match ends, or 24 hours after creation if the match never starts.</small>
     </div>
@@ -1273,22 +1303,35 @@ function TimerCard({ value, label }: { value: string; label: string }) {
   return <div className="timer-card"><strong>{value}</strong><span>{label}</span></div>
 }
 
-function ScoreBoard({ config, score, server }: { config: SessionConfig; score: ReturnType<typeof calculateGameScore>; server: keyof SessionConfig['names'] }) {
-  const playerSideServer = server === 'player1' || server === 'player2'
+function ScoreBoard({ config, score, progress }: { config: SessionConfig; score: ReturnType<typeof calculateGameScore>; progress: ReactNode }) {
   return (
-    <div className="scoreboard panel no-pad">
-      <ScoreRow name={sideName(config, 'player')} role={config.mode === 'single' ? 'Player' : 'Your Team'} score={score.playerDisplay} server={playerSideServer ? config.names[server] : ''} advantage={score.advantage === 'player'} />
-      <ScoreRow name={sideName(config, 'opponent')} role={config.mode === 'single' ? 'Opponent' : 'Opponent Team'} score={score.opponentDisplay} server={!playerSideServer ? config.names[server] : ''} advantage={score.advantage === 'opponent'} />
+    <div className="scoreboard">
+      {progress}
+      <ScoreRow name={sideName(config, 'player')} role={config.mode === 'single' ? 'Player' : 'Your Team'} score={score.playerDisplay} advantage={score.advantage === 'player'} />
+      <div className="score-net" aria-hidden="true" />
+      <ScoreRow name={sideName(config, 'opponent')} role={config.mode === 'single' ? 'Opponent' : 'Opponent Team'} score={score.opponentDisplay} advantage={score.advantage === 'opponent'} />
     </div>
   )
 }
 
-function ScoreRow({ name, role, score, server, advantage }: { name: string; role: string; score: string; server: string; advantage: boolean }) {
+function ScoreRow({ name, role, score, advantage }: { name: string; role: string; score: string; advantage: boolean }) {
   return (
     <div className="score-row">
       <div className="score-name"><strong>{name}</strong><small>{role}</small></div>
-      <div>{server && <span className="serve-badge">{server} SERVES</span>}</div>
-      <div className="score-value"><strong>{score}</strong>{advantage && <small>ADV</small>}</div>
+      <div className="score-value">{advantage && <span className="adv-tag">ADV</span>}<strong>{score}</strong></div>
+    </div>
+  )
+}
+
+function ServeBadge({ name }: { name: string }) {
+  return <span className="serve-badge"><BallIcon className="icon" dark /><span className="serve-name">{name}</span> serves</span>
+}
+
+function PlayControls({ canUndo, onUndo, onPause }: { canUndo: boolean; onUndo: () => void; onPause: () => void }) {
+  return (
+    <div className="two-col">
+      <button className="button button-secondary" disabled={!canUndo} onClick={onUndo}><UndoIcon />Undo</button>
+      <button className="button button-secondary" onClick={onPause}><PauseIcon />Pause</button>
     </div>
   )
 }
@@ -1348,43 +1391,117 @@ function TieBreakBanner({ config, score }: { config: SessionConfig; score: Retur
   return <div className="deuce-banner small"><strong>First to {config.tieBreakMaxPoint}</strong><small>Equal at maximum: {tieBreakEqualLabel(config.tieBreakEqualResolution)}</small></div>
 }
 
-function GameHistory({ config, record, score, compact = false }: { config: SessionConfig; record: GameRecord; score: ReturnType<typeof calculateGameScore>; compact?: boolean }) {
+function GameHistory({ config, record, score, compact = false, collapsible = false }: { config: SessionConfig; record: GameRecord; score: ReturnType<typeof calculateGameScore>; compact?: boolean; collapsible?: boolean }) {
+  const title = <div><strong>Game {record.gameNumber}</strong><small>{sideName(config, record.winner)} won · Server: {serverName(config, record.server)}{collapsible ? ` · ${score.history.length} points` : ''}</small></div>
+  const points = (
+    <ol className={`point-history ${compact ? 'compact-history' : ''}`}>
+      {score.history.map((item) => <li key={item.number}><span>{item.number}</span><strong>{item.text}</strong></li>)}
+    </ol>
+  )
+  if (collapsible) {
+    return (
+      <details className="panel history-card">
+        <summary className="history-title">{title}<span>{formatDuration(record.durationMs)}<ChevronIcon /></span></summary>
+        {points}
+      </details>
+    )
+  }
   return (
     <div className="panel history-card">
-      <div className="history-title">
-        <div><strong>Game {record.gameNumber}</strong><small>{sideName(config, record.winner)} {config.mode === 'double' ? 'won' : 'won'} · Server: {serverName(config, record.server)}</small></div>
-        <span>{formatDuration(record.durationMs)}</span>
-      </div>
+      <div className="history-title">{title}<span>{formatDuration(record.durationMs)}</span></div>
       <div className="history-head"><small>Point history</small><small>{score.history.length} points</small></div>
-      <ol className={`point-history ${compact ? 'compact-history' : ''}`}>
-        {score.history.map((item) => <li key={item.number}><span>{item.number}</span><strong>{item.text}</strong></li>)}
-      </ol>
+      {points}
     </div>
   )
 }
 
 function Choice({ selected, title, subtitle, onClick }: { selected: boolean; title: string; subtitle: string; onClick: () => void }) {
-  return <button className={`choice ${selected ? 'selected' : ''}`} onClick={onClick}><strong>{title}</strong><span>{subtitle}</span></button>
+  return (
+    <button className={`choice ${selected ? 'selected' : ''}`} aria-pressed={selected} onClick={onClick}>
+      <span className="choice-radio" aria-hidden="true" />
+      <span className="choice-text"><strong>{title}</strong><span>{subtitle}</span></span>
+    </button>
+  )
 }
 
 function ChoiceCompact({ selected, title, subtitle, onClick }: { selected: boolean; title: string; subtitle?: string; onClick: () => void }) {
-  return <button className={`choice compact-choice ${selected ? 'selected' : ''}`} onClick={onClick}><strong>{title}</strong>{subtitle && <span>{subtitle}</span>}</button>
+  return (
+    <button className={`choice compact-choice ${selected ? 'selected' : ''}`} aria-pressed={selected} onClick={onClick}>
+      <span className="choice-radio" aria-hidden="true" />
+      <span className="choice-text"><strong>{selected && <BallIcon className="choice-ball" dark />} {title}</strong>{subtitle && <span>{subtitle}</span>}</span>
+    </button>
+  )
 }
 
-function TextField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
-  return <label className="field"><span>{label}</span><input value={value} onChange={(event: { target: { value: string } }) => onChange(event.target.value)} /></label>
+function TextField({ label, value, placeholder, onChange }: { label: string; value: string; placeholder?: string; onChange: (value: string) => void }) {
+  return <label className="field"><span>{label}</span><input value={value} placeholder={placeholder} onChange={(event: { target: { value: string } }) => onChange(event.target.value)} /></label>
 }
 
-function SelectField({ label, value, values, onChange }: { label: string; value: number; values: number[]; onChange: (value: number) => void }) {
-  return <label className="field"><span>{label}</span><select value={value} onChange={(event: { target: { value: string } }) => onChange(Number(event.target.value))}>{values.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
+function Stepper({ label, value, min, max, hint, hero = false, onChange }: { label: string; value: number; min: number; max: number; hint?: string; hero?: boolean; onChange: (value: number) => void }) {
+  return (
+    <div className={`stepper-field ${hero ? 'stepper-hero' : ''}`} role="group" aria-label={label}>
+      <span>{label}</span>
+      <div className="stepper">
+        <button type="button" aria-label={`Decrease ${label}`} disabled={value <= min} onClick={() => onChange(value - 1)}>−</button>
+        <output aria-live="polite">{value}</output>
+        <button type="button" aria-label={`Increase ${label}`} disabled={value >= max} onClick={() => onChange(value + 1)}>+</button>
+      </div>
+      {hint && <span className="stepper-hint">{hint}</span>}
+    </div>
+  )
+}
+
+function ChipRow({ label, value, values, onChange }: { label: string; value: number; values: number[]; onChange: (value: number) => void }) {
+  return (
+    <div className="chip-row" role="group" aria-label={label}>
+      {values.map((item) => <button type="button" key={item} className={`chip ${item === value ? 'selected' : ''}`} aria-pressed={item === value} onClick={() => onChange(item)}>{item}</button>)}
+    </div>
+  )
+}
+
+function Segmented({ label, value, values, onChange }: { label: string; value: number; values: number[]; onChange: (value: number) => void }) {
+  return (
+    <div className="segmented" role="group" aria-label={label}>
+      {values.map((item) => <button type="button" key={item} className={item === value ? 'selected' : ''} aria-pressed={item === value} onClick={() => onChange(item)}>{item}</button>)}
+    </div>
+  )
 }
 
 function NavButtons({ onBack, onNext, nextLabel }: { onBack: () => void; onNext: () => void; nextLabel: string }) {
-  return <div className="two-col"><button className="button button-secondary" onClick={onBack}>BACK</button><button className="button button-primary" onClick={onNext}>{nextLabel}</button></div>
+  return (
+    <div className="sticky-actions">
+      <div className="two-col nav-buttons"><button className="button button-secondary" onClick={onBack}>Back</button><button className="button button-primary" onClick={onNext}>{nextLabel}</button></div>
+    </div>
+  )
 }
 
-function Summary({ label, value }: { label: string; value: string }) {
-  return <div><small>{label}</small><strong>{value}</strong></div>
+function BallIcon({ className = 'icon', dark = false }: { className?: string; dark?: boolean }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="10.5" fill={dark ? '#0F2440' : '#DFF04A'} />
+      <path d="M3.5 7c4.5 2.2 4.5 7.8 0 10M20.5 7c-4.5 2.2-4.5 7.8 0 10" fill="none" stroke={dark ? '#DFF04A' : '#FFFFFF'} strokeWidth="1.5" />
+    </svg>
+  )
+}
+
+function UndoIcon() {
+  return <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true"><path d="M9 14 4 9l5-5" /><path d="M4 9h11a5 5 0 0 1 0 10h-3" /></svg>
+}
+
+function PauseIcon() {
+  return <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" aria-hidden="true"><path d="M8 5v14M16 5v14" /></svg>
+}
+
+function SwapIcon() {
+  return <svg className="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true"><path d="M4 9h13l-3-3M20 15H7l3 3" /></svg>
+}
+
+function ChevronIcon() {
+  return <svg className="icon history-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+}
+
+function Summary({ label, value, ball = false }: { label: string; value: string; ball?: boolean }) {
+  return <div className="summary-item"><small>{label}</small><strong>{ball && <BallIcon className="icon" />} {value}</strong></div>
 }
 
 function InfoBox({ children }: { children: ReactNode }) {
